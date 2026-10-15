@@ -16,7 +16,6 @@
   --serif: 'Black Mango', 'Bodoni Moda', Didot, Georgia, serif;
   --sans: 'BW Modelica', 'Bw Modelica', 'Outfit', system-ui, sans-serif;
   --mono: 'DM Mono', ui-monospace, monospace;
-  --textura: url('/img/textura.jpg');
   --r: 22px; --r-sm: 14px;
   --sombra: 0 1px 2px rgba(43, 26, 20, .05), 0 10px 30px rgba(43, 26, 20, .07);
 }
@@ -481,7 +480,7 @@ textarea.entrada { resize: vertical; min-height: 84px; line-height: 1.5; }
 .quadro-interativo { width: 100%; height: max(640px, calc(100vh - 140px)); border: 1px solid var(--line); border-radius: var(--r); background: #fff; display: block; }
 
 
-/* ---------- Identidade visual: logo, textura e fontes ---------- */
+/* ---------- Identidade visual: logo e fontes ---------- */
 .logo-img { display: block; width: 150px; height: auto; }
 .carregando-tela .logo-img { width: 190px; animation: pulsar 1.6s ease-in-out infinite; }
 .lateral .marca .logo-img { width: 138px; margin-bottom: 2px; }
@@ -489,20 +488,11 @@ textarea.entrada { resize: vertical; min-height: 84px; line-height: 1.5; }
 .lateral .assinatura { display: flex; align-items: center; gap: 10px; }
 .lateral .assinatura img { width: 74px; opacity: .9; }
 
-/* Textura de camurça (foto da marca), usada em poucos lugares. */
-.camurca { background: var(--terracota) url('/img/camurca.jpg') center / cover !important; }
-.camurca::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(34, 21, 15, .15), rgba(34, 21, 15, .55)); pointer-events: none; }
-.tela-login .arte.camurca > * { position: relative; }
-.cartao.destaque, .doc-posicionamento, .doc-formato, .doc-capa {
-  background-image: var(--textura);
-  background-size: 520px;
-  background-blend-mode: soft-light;
-}
-.cartao.destaque { background-color: var(--acc); }
-.doc-posicionamento, .doc-formato { background-color: var(--acc); }
-.doc-capa { background-color: var(--choc); background-blend-mode: soft-light; }
-.doc-capa h1 { color: var(--creme); }
-.carregando-tela { background: var(--choc) var(--textura) center / 520px; background-blend-mode: soft-light; }
+/* Cores sólidas nos blocos de destaque (sem textura). */
+.tela-login .arte { background: var(--choc); }
+.doc-capa { background: var(--choc); }
+.doc-capa h1, .tela-login .arte h1 { color: var(--creme); }
+.doc-formato::after { display: none; }
 
 /* Textos maiores na fonte secundária (BW Modelica), que dá mais leitura. */
 .frase-grande { font-family: var(--sans); font-weight: 300; letter-spacing: -.01em; line-height: 1.3; }

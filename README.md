@@ -40,7 +40,6 @@ Regras do arquivo: um único `.html` de até 4 MB (imagens dentro do arquivo ou 
 
 - Logos em `public/img/` (`logo-creme.png` para fundos escuros, `logo-terracota.png` para fundos claros) e ícone da aba em `icone.png`.
 - Cores da marca: terracota `#8a391b` e creme `#f1e6b2`, com chocolate e areia de apoio (variáveis no topo de `public/css/estilo.css`).
-- Textura de camurça (`camurca.jpg` e a versão neutra `textura.jpg`) aparece só no login, no cartão de seguidores e nos blocos de destaque da linha editorial.
 - Fontes: **Black Mango** nos títulos e **BW Modelica** nos textos. Elas são pagas e não estão no Google Fonts, então, enquanto os arquivos não forem colocados em `public/fonts/`, o portal usa Bodoni Moda e Outfit, que são parecidas. Quem tem as fontes instaladas no computador já as vê.
 
 ## Stack

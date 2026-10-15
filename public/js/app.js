@@ -81,7 +81,7 @@ function telaLogin(mensagem = '') {
   document.title = 'Entrar · Vie Company';
   app.innerHTML = `
     <div class="tela-login">
-      <div class="arte camurca">
+      <div class="arte">
         <img class="logo-img" src="/img/logo-creme.png" alt="Vie Company">
         <div>
           <p class="mono" style="color:var(--creme-2)">Consultoria editorial</p>
@@ -129,7 +129,7 @@ async function telaConvite(token) {
   }
   app.innerHTML = `
     <div class="tela-login">
-      <div class="arte camurca">
+      <div class="arte">
         <img class="logo-img" src="/img/logo-creme.png" alt="Vie Company">
         <div>
           <p class="mono" style="color:var(--creme-2)">${convite.cliente ? 'Portal exclusivo' : 'Equipe Vie'}</p>
