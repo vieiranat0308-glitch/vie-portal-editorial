@@ -81,8 +81,8 @@ function telaLogin(mensagem = '') {
   document.title = 'Entrar · Vie Company';
   app.innerHTML = `
     <div class="tela-login">
-      <div class="arte">
-        <span class="logo-vie">Vie<small>company</small></span>
+      <div class="arte camurca">
+        <img class="logo-img" src="/img/logo-creme.png" alt="Vie Company">
         <div>
           <p class="mono" style="color:var(--creme-2)">Consultoria editorial</p>
           <div class="linha"></div>
@@ -120,7 +120,7 @@ function telaLogin(mensagem = '') {
 
 async function telaConvite(token) {
   document.title = 'Criar acesso · Vie Company';
-  app.innerHTML = '<div class="carregando-tela"><span class="logo-vie">Vie<small>company</small></span></div>';
+  app.innerHTML = '<div class="carregando-tela"><img class="logo-img" src="/img/logo-creme.png" alt="Vie Company"></div>';
   let convite;
   try {
     convite = await api('auth', { metodo: 'POST', corpo: { acao: 'convite-info', token } });
@@ -129,8 +129,8 @@ async function telaConvite(token) {
   }
   app.innerHTML = `
     <div class="tela-login">
-      <div class="arte">
-        <span class="logo-vie">Vie<small>company</small></span>
+      <div class="arte camurca">
+        <img class="logo-img" src="/img/logo-creme.png" alt="Vie Company">
         <div>
           <p class="mono" style="color:var(--creme-2)">${convite.cliente ? 'Portal exclusivo' : 'Equipe Vie'}</p>
           <div class="linha"></div>
@@ -173,7 +173,7 @@ function moldura({ marcaHtml, menuHtml, titulo }) {
         <div class="rodape">
           <div class="usuario"><span class="avatar">${esc(iniciais(u.nome))}</span><div><div class="nome">${esc(u.nome)}</div><div class="sub">${u.role === 'admin' ? 'Equipe Vie' : 'Cliente'}</div></div></div>
           <div class="acoes"><button data-conta>Minha conta</button><button data-sair>Sair</button></div>
-          ${u.role === 'admin' ? '' : '<div class="assinatura">Consultoria editorial · Vie Company</div>'}
+          ${u.role === 'admin' ? '' : '<div class="assinatura"><img src="/img/logo-creme.png" alt="Vie Company"><span>Consultoria editorial</span></div>'}
         </div>
       </div></aside>
       <div>
@@ -211,7 +211,7 @@ async function telaCliente(rota) {
     return ir('/');
   }
   if (estado.cache.cliente?.id !== cliente.id) estado.cache = { cliente };
-  document.documentElement.style.setProperty('--acc', cliente.cor || '#7f2a2e');
+  document.documentElement.style.setProperty('--acc', cliente.cor || '#8a391b');
   document.title = `${cliente.nome} · Portal Editorial`;
 
   const base = `#/c/${encodeURIComponent(cliente.id)}`;
@@ -234,7 +234,7 @@ async function telaCliente(rota) {
 }
 
 async function telaVie(rota) {
-  document.documentElement.style.setProperty('--acc', '#7f2a2e');
+  document.documentElement.style.setProperty('--acc', '#8a391b');
   document.title = 'Vie Company · Portal Editorial';
   if (!estado.clientes) estado.clientes = await api('clientes').catch(() => []);
   const menuHtml = `
@@ -245,7 +245,7 @@ async function telaVie(rota) {
     <div class="grupo"><span class="mono">Clientes</span>
       ${estado.clientes.map((c) => `<a class="nav-item" href="#/c/${encodeURIComponent(c.id)}"><span class="bolinha" style="--cor:${esc(c.cor)}"></span><span>${esc(c.nome)}</span></a>`).join('') || '<span class="nav-item" style="opacity:.6">Nenhum cliente ainda</span>'}
     </div>`;
-  const marcaHtml = '<span class="logo-vie">Vie<small>company</small></span><span class="mono">Portal editorial</span>';
+  const marcaHtml = '<img class="logo-img" src="/img/logo-creme.png" alt="Vie Company"><span class="mono">Portal editorial</span>';
   const conteudo = moldura({ marcaHtml, menuHtml, titulo: 'Vie Company' });
   const ctx = criarContexto({ cliente: null, admin: true, rota, conteudo });
   await carregarPagina('vie', conteudo, ctx);

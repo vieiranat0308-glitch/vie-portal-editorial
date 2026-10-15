@@ -32,7 +32,7 @@ export async function render(el, ctx) {
           <span style="margin-left:auto">${etiquetaStatus(p.status)}</span>
         </div>
         <h3 class="serif" style="font-size:22px">${p.titulo ? esc(p.titulo) : '<span class="sem-titulo">Sem título</span>'}</h3>
-        ${p.gancho ? `<p class="citacao" style="font:italic 17px/1.4 var(--serif);border-left:3px solid var(--acc);padding-left:14px">“${esc(p.gancho)}”</p>` : ''}
+        ${p.gancho ? `<p class="citacao" style="font:400 16px/1.5 var(--sans);border-left:3px solid var(--acc);padding-left:14px">“${esc(p.gancho)}”</p>` : ''}
         ${ultimo ? `<div class="comentario${ultimo.admin ? ' vie' : ''}"><div class="quem"><b>${esc(ultimo.nome)}</b><span style="margin-left:auto">${esc(quando(ultimo.em))}</span></div><p>${esc(ultimo.texto)}</p></div>` : ''}
         <div><button class="btn ${p.status === 'aprovacao' && !admin ? 'acc' : 'claro'} peq" data-abrir="${p.mes}|${p.id}">${p.status === 'aprovacao' && !admin ? 'Ver e aprovar' : 'Abrir conteúdo'}</button></div>
       </div>`;

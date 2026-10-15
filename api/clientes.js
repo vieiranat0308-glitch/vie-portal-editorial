@@ -62,7 +62,7 @@ export default handler(async (req, res, usuario) => {
 });
 
 function limpar(c) {
-  const cor = /^#[0-9a-f]{6}$/i.test(c.cor || '') ? c.cor : '#7f2a2e';
+  const cor = /^#[0-9a-f]{6}$/i.test(c.cor || '') ? c.cor : '#8a391b';
   return {
     nome: texto(c.nome, 120).trim(),
     tratamento: texto(c.tratamento, 60).trim(),

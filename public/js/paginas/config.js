@@ -7,7 +7,7 @@ export function camposCliente(c = {}) {
     <label class="campo"><span>Como chamar na saudação</span><input class="entrada" name="tratamento" value="${esc(c.tratamento || '')}" placeholder="Ex.: Izabella"></label>
     <label class="campo"><span>Instagram</span><input class="entrada" name="instagram" value="${esc(c.instagram || '')}" placeholder="@perfil"></label>
     <label class="campo"><span>Especialidade</span><input class="entrada" name="especialidade" value="${esc(c.especialidade || '')}" placeholder="Ex.: Nutrologia, Odontologia"></label>
-    <label class="campo"><span>Cor de destaque do portal</span><input class="entrada" type="color" name="cor" value="${esc(c.cor || '#7f2a2e')}" style="height:44px;padding:4px"></label>`;
+    <label class="campo"><span>Cor de destaque do portal</span><input class="entrada" type="color" name="cor" value="${esc(c.cor || '#8a391b')}" style="height:44px;padding:4px"></label>`;
 }
 
 export async function render(el, ctx) {

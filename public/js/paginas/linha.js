@@ -231,7 +231,7 @@ function leitura(el, ctx, e) {
   add('formato', 'Formato', e.formato?.titulo && `
     <section class="doc-secao doc-formato" id="formato">
       <span class="rotulo">Formato de conteúdo</span>
-      <p class="frase-grande" style="margin:14px 0 18px">${esc(e.formato.titulo)}</p>
+      <p class="frase-grande titulo-grande" style="margin:14px 0 18px">${esc(e.formato.titulo)}</p>
       <p style="font-size:17px;max-width:60ch;position:relative;z-index:1">${esc(e.formato.texto)}</p>
     </section>`);
 
@@ -247,7 +247,7 @@ function leitura(el, ctx, e) {
   el.innerHTML = `
     <div class="doc">
       <header class="doc-capa">
-        <div class="topo-capa"><span class="logo-vie" style="font-size:28px">Vie<small>company</small></span><span class="mono" style="color:var(--creme-2)">${esc(e.periodo || '')}</span></div>
+        <div class="topo-capa"><img class="logo-img" src="/img/logo-creme.png" alt="Vie Company" style="width:120px"><span class="mono" style="color:var(--creme-2)">${esc(e.periodo || '')}</span></div>
         <div>
           <p class="rotulo">Estratégia de conteúdo</p>
           <h1>${esc(cliente.nome)}</h1>
