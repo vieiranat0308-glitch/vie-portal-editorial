@@ -1,0 +1,7 @@
+{
+  "framework": null,
+  "outputDirectory": "public",
+  "functions": {
+    "api/documentos.js": { "maxDuration": 60 }
+  }
+}
