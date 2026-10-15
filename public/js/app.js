@@ -296,7 +296,8 @@ async function atualizarContadorAprovacao({ cliente, admin }) {
   try {
     const meses = await api(`cronograma?cliente=${encodeURIComponent(cliente.id)}`);
     const chave = admin ? 'ajuste' : 'aprovacao';
-    const total = meses.reduce((s, m) => s + (m.porStatus[chave] || 0), 0);
+    const mesInterativo = admin ? 'ajuste' : 'aguardando';
+    const total = meses.reduce((s, m) => s + (m.porStatus[chave] || 0) + (m.aprovacaoMes === mesInterativo ? 1 : 0), 0);
     alvo.textContent = total || '';
     alvo.classList.toggle('alerta', total > 0);
     alvo.title = admin ? 'Ajustes pedidos pelo cliente' : 'Conteúdos esperando a sua aprovação';

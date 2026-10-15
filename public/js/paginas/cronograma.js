@@ -1,5 +1,6 @@
-// Cronograma mensal: calendário, lista por semana, prévia do feed e stories.
-import { api, esc, aviso, falhou, abrirCamada, confirmar, hojeISO, mesAtual, somarMes, dataObj, dataCurta, diaSemanaCurto, icones, iniciais } from '../ui.js';
+// Cronograma mensal: calendário, lista por semana, prévia do feed e stories,
+// ou o cronograma interativo (HTML pronto feito pela equipe Vie).
+import { api, esc, aviso, falhou, abrirCamada, confirmar, hojeISO, mesAtual, somarMes, dataObj, dataCurta, diaSemanaCurto, quando, icones, iniciais } from '../ui.js';
 import { FORMATOS, nomeDoMes, corDoPilar } from '../regras.js';
 import { abrirPost, etiquetaFormato, etiquetaPilar, etiquetaStatus } from '../componentes/post.js';
 
@@ -43,12 +44,17 @@ export async function render(el, ctx) {
       return;
     }
     const posts = doc.posts || [];
+    const abas = [
+      ...(doc.interativo ? [['interativo', 'Cronograma interativo']] : []),
+      ...(posts.length || !doc.interativo ? [['calendario', 'Calendário'], ['lista', 'Lista'], ['feed', 'Prévia do feed'], ['stories', 'Stories']] : []),
+    ];
+    if (!abas.some(([k]) => k === visao)) visao = abas[0][0];
     el.innerHTML = `
       ${admin && doc.status !== 'publicado' ? `
         <div class="aviso-rascunho">
-          <span><b>Rascunho.</b> ${esc(cliente.nome)} ainda não vê este mês. Revise os conteúdos e libere quando estiver pronto.</span>
-          ${!posts.length ? '<button class="btn claro peq" data-esqueleto>Montar mês pela linha editorial</button>' : ''}
-          <button class="btn acc peq" data-publicar ${posts.length ? '' : 'disabled'}>Liberar para o cliente</button>
+          <span><b>Rascunho.</b> ${esc(cliente.nome)} ainda não vê este mês. ${doc.interativo || posts.length ? 'Revise e libere quando estiver pronto.' : 'Suba o cronograma pronto ou monte os conteúdos aqui no portal.'}</span>
+          ${!posts.length && !doc.interativo ? `<button class="btn claro peq" data-subir>${icones.baixar}Subir cronograma pronto (HTML)</button><button class="btn fantasma peq" data-esqueleto>Montar pela linha editorial</button>` : ''}
+          <button class="btn acc peq" data-publicar ${posts.length || doc.interativo ? '' : 'disabled'}>Liberar para o cliente</button>
         </div>` : ''}
 
       <div class="faixa-mes">
@@ -57,26 +63,28 @@ export async function render(el, ctx) {
           ${doc.observacoes ? `<p class="obs">${esc(doc.observacoes)}</p>` : ''}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+          ${admin && (doc.interativo || posts.length) ? `<button class="btn claro peq" data-subir>${icones.baixar}${doc.interativo ? 'Substituir HTML' : 'Subir cronograma pronto (HTML)'}</button>` : ''}
           ${admin ? `<button class="btn claro peq" data-foco>${icones.editar}Foco e recados</button>` : ''}
           ${admin && posts.length ? '<button class="btn claro peq" data-esqueleto>Completar pela linha editorial</button>' : ''}
           ${admin && doc.status === 'publicado' ? '<button class="btn fantasma peq" data-despublicar>Voltar para rascunho</button>' : ''}
-          <button class="btn claro peq" onclick="window.print()">${icones.imprimir}Imprimir</button>
+          ${posts.length ? `<button class="btn claro peq" onclick="window.print()">${icones.imprimir}Imprimir</button>` : ''}
         </div>
       </div>
 
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
-        <div class="abas" role="tablist">
-          ${[['calendario', 'Calendário'], ['lista', 'Lista'], ['feed', 'Prévia do feed'], ['stories', 'Stories']].map(([k, n]) => `<button data-visao="${k}" class="${visao === k ? 'ativo' : ''}">${n}</button>`).join('')}
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto">
+        ${abas.length > 1 ? `<div class="abas" role="tablist">
+          ${abas.map(([k, n]) => `<button data-visao="${k}" class="${visao === k ? 'ativo' : ''}">${n}</button>`).join('')}
+        </div>` : ''}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto${visao === 'interativo' ? ';display:none' : ''}">
           ${pilares.map((p) => `<span class="etq cheia" style="--cor:${corDoPilar(pilares, p.id)}"><span class="ponto"></span>${esc(p.nome)}</span>`).join('')}
         </div>
       </div>
       <div data-visao-corpo></div>`;
 
     const corpo = el.querySelector('[data-visao-corpo]');
-    if (!posts.length && visao !== 'stories') {
-      corpo.innerHTML = `<div class="vazio"><strong>Nenhum conteúdo neste mês</strong>${admin ? 'Use “Montar mês pela linha editorial” para criar os conteúdos a partir da frequência e do banco de ideias, ou adicione um por um.' : ''}</div>`;
+    if (visao === 'interativo') corpo.innerHTML = interativo();
+    else if (!posts.length && visao !== 'stories') {
+      corpo.innerHTML = `<div class="vazio"><strong>Nenhum conteúdo neste mês</strong>${admin ? 'Suba o cronograma pronto em HTML, ou monte os conteúdos aqui no portal (“Montar pela linha editorial” ou “Novo conteúdo”).' : ''}</div>`;
     } else if (visao === 'calendario') corpo.innerHTML = calendario(posts);
     else if (visao === 'lista') corpo.innerHTML = lista(posts);
     else if (visao === 'feed') corpo.innerHTML = previaFeed(posts);
@@ -97,11 +105,12 @@ export async function render(el, ctx) {
       const m = abrirCamada(`
         <h2>Liberar ${esc(nomeDoMes(mes))}</h2>
         <p>${esc(cliente.nome)} vai passar a ver o cronograma deste mês no portal.</p>
-        <label class="opcoes-check"><label><input type="checkbox" checked data-pedir> Pedir aprovação dos conteúdos “Planejados”</label></label>
-        <p class="muted" style="font-size:13px">Com essa opção, os conteúdos ficam como “Para aprovar” e o cliente aprova ou pede ajuste em cada um.</p>
+        ${doc.interativo ? '<p class="muted" style="font-size:14px">No cronograma interativo, o cliente pode aprovar o mês ou pedir ajuste com um comentário.</p>' : ''}
+        ${posts.length ? `<label class="opcoes-check"><label><input type="checkbox" checked data-pedir> Pedir aprovação dos conteúdos “Planejados”</label></label>
+        <p class="muted" style="font-size:13px">Com essa opção, os conteúdos ficam como “Para aprovar” e o cliente aprova ou pede ajuste em cada um.</p>` : ''}
         <div class="rodape-modal"><button class="btn claro" data-fechar>Cancelar</button><button class="btn acc" data-ok>Liberar para o cliente</button></div>`);
       m.el.querySelector('[data-ok]').onclick = async () => {
-        const pedirAprovacao = m.el.querySelector('[data-pedir]').checked;
+        const pedirAprovacao = !!m.el.querySelector('[data-pedir]')?.checked;
         m.fechar();
         await salvarMes({ status: 'publicado', pedirAprovacao });
         aviso('Cronograma liberado para o cliente.');
@@ -124,6 +133,33 @@ export async function render(el, ctx) {
         } catch (err) { falhou(err); }
       };
     });
+    el.querySelectorAll('[data-subir]').forEach((b) => { b.onclick = subirHtml; });
+    el.querySelector('[data-remover-html]')?.addEventListener('click', async () => {
+      if (!(await confirmar('O arquivo do cronograma interativo será removido deste mês.', { botao: 'Remover', perigo: true }))) return;
+      enviarAcao({ acao: 'remover-interativo' });
+    });
+    el.querySelector('[data-aprovar-mes]')?.addEventListener('click', async () => {
+      await enviarAcao({ acao: 'aprovar-mes' });
+      aviso('Cronograma aprovado. Obrigada!');
+    });
+    el.querySelector('[data-ajuste-mes]')?.addEventListener('click', () => {
+      const m = abrirCamada(`
+        <h2>O que você gostaria de ajustar?</h2>
+        <p class="muted">Conte quais dias ou conteúdos mudar. A equipe Vie devolve o cronograma ajustado.</p>
+        <textarea class="entrada" rows="5" autofocus placeholder="Ex.: trocar o tema do dia 12, já gravei o reel do dia 20…"></textarea>
+        <div class="rodape-modal"><button class="btn claro" data-fechar>Cancelar</button><button class="btn acc" data-ok>Enviar pedido</button></div>`);
+      m.el.querySelector('[data-ok]').onclick = async () => {
+        const comentario = m.el.querySelector('textarea').value.trim();
+        if (!comentario) return aviso('Conte rapidinho o que ajustar.', { erro: true });
+        m.fechar();
+        await enviarAcao({ acao: 'ajuste-mes', comentario });
+        aviso('Pedido de ajuste enviado para a equipe Vie.');
+      };
+    });
+    el.querySelector('[data-comentar-mes]')?.addEventListener('click', async () => {
+      const texto = el.querySelector('[data-comentario-mes]').value.trim();
+      if (texto) await enviarAcao({ acao: 'comentar-mes', texto });
+    });
     el.querySelector('[data-foco]')?.addEventListener('click', () => {
       const m = abrirCamada(`
         <h2>Foco e recados do mês</h2>
@@ -135,6 +171,65 @@ export async function render(el, ctx) {
         m.fechar();
       };
     });
+  }
+
+  async function enviarAcao(corpo) {
+    try {
+      atualizar(await api(`cronograma?cliente=${id}&mes=${mes}`, { metodo: 'POST', corpo }));
+      ctx.atualizarContadores();
+    } catch (err) { falhou(err); }
+  }
+
+  function subirHtml() {
+    const m = abrirCamada(`
+      <h2>${doc.interativo ? 'Substituir o cronograma' : 'Subir cronograma pronto'}</h2>
+      <p class="muted">Envie o arquivo <b>.html</b> do cronograma de ${esc(nomeDoMes(mes))} (o mesmo que vocês publicariam no Netlify). Ele aparece dentro do portal, só para ${esc(cliente.nome)}.</p>
+      <label class="campo"><span>Arquivo HTML (até 4 MB)</span><input class="entrada" type="file" accept=".html,.htm,text/html"></label>
+      <p class="muted" style="font-size:13px">Precisa ser um arquivo único. Imagens podem estar dentro do HTML ou em links externos. Se o mês já tinha sido aprovado, a nova versão volta a esperar a aprovação do cliente.</p>
+      <div class="rodape-modal"><button class="btn claro" data-fechar>Cancelar</button><button class="btn acc" data-ok>Enviar</button></div>`);
+    m.el.querySelector('[data-ok]').onclick = async (ev) => {
+      const f = m.el.querySelector('input[type=file]').files[0];
+      if (!f) return aviso('Escolha o arquivo.', { erro: true });
+      if (f.size > 4 * 1024 * 1024) return aviso('Arquivo acima de 4 MB. Deixe as imagens em links externos ou comprima-as.', { erro: true });
+      ev.target.disabled = true;
+      try {
+        atualizar(await api(`cronograma?cliente=${id}&mes=${mes}&interativo=1&nome=${encodeURIComponent(f.name)}`, { metodo: 'POST', arquivo: f }));
+        visao = 'interativo';
+        m.fechar();
+        aviso(doc.status === 'publicado' ? 'Cronograma atualizado. O cliente já vê a nova versão.' : 'Cronograma enviado. Confira e clique em “Liberar para o cliente”.');
+        desenhar();
+      } catch (err) {
+        falhou(err);
+        ev.target.disabled = false;
+      }
+    };
+  }
+
+  function interativo() {
+    const src = `/api/cronograma?cliente=${id}&mes=${mes}&interativo=1&v=${encodeURIComponent(doc.interativo.enviadoEm)}`;
+    const ap = doc.aprovacaoMes;
+    const estado = ap?.status === 'aprovado' ? ['Aprovado', 'var(--s-aprovado)'] : ap?.status === 'ajuste' ? ['Ajuste pedido', 'var(--s-ajuste)'] : ['Esperando aprovação', 'var(--s-aprovacao)'];
+    const conversa = doc.conversa || [];
+    return `
+      <div class="cartao" style="margin-bottom:16px;display:grid;gap:14px">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <span class="etq" style="--cor:${estado[1]}"><span class="ponto"></span>${estado[0]}</span>
+          <span class="muted" style="font-size:13px">${ap ? `por ${esc(ap.nome)} em ${esc(quando(ap.em))}` : `versão enviada em ${esc(quando(doc.interativo.enviadoEm))}`}</span>
+          <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+            ${!admin && ap?.status !== 'aprovado' ? '<button class="btn acc peq" data-aprovar-mes>Aprovar cronograma</button><button class="btn claro peq" data-ajuste-mes>Pedir ajuste</button>' : ''}
+            <a class="btn claro peq" href="${src}" target="_blank" rel="noopener">${icones.link}Abrir em tela cheia</a>
+            ${admin ? `<button class="btn-icone" data-remover-html title="Remover arquivo">${icones.lixo}</button>` : ''}
+          </span>
+        </div>
+        ${conversa.length ? `<div style="display:grid;gap:8px">${conversa.slice(-3).map((c) => `
+          <div class="comentario${c.admin ? ' vie' : ''}"><div class="quem"><b>${esc(c.nome)}</b>${c.admin ? '<span>· Vie</span>' : ''}<span style="margin-left:auto">${esc(quando(c.em))}</span></div><p>${esc(c.texto)}</p></div>`).join('')}</div>` : ''}
+        <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+          <textarea class="entrada" data-comentario-mes rows="1" placeholder="Comentário sobre o cronograma do mês…" style="flex:1;min-width:220px;min-height:44px"></textarea>
+          <button class="btn claro" data-comentar-mes>Enviar</button>
+        </div>
+      </div>
+      <iframe class="quadro-interativo" src="${src}" title="Cronograma interativo de ${esc(nomeDoMes(mes))}"
+        sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals allow-downloads"></iframe>`;
   }
 
   function chip(p) {

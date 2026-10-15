@@ -17,7 +17,18 @@ Portal da **consultoria editorial** da Vie Company. A equipe Vie acompanha todos
 
 **Isolamento entre clientes:** toda checagem de permissão acontece no servidor (`lib/base.js → exigirAcessoCliente`). Um cliente só consegue ler os dados do próprio cliente, não vê meses em rascunho nem as notas internas da Vie. Os arquivos nunca ficam com link público: o download passa pela API, que confere quem está pedindo.
 
-### Fluxo de um mês
+### Cronograma pronto (HTML interativo)
+
+Se o cronograma do mês é feito fora do portal (como os sites que vocês publicavam no Netlify), dá para **subir o arquivo .html pronto**:
+
+1. Abra o cliente → **Cronograma** → escolha o mês → **Subir cronograma pronto (HTML)**.
+2. Confira como ficou (ele aparece dentro do portal, com todos os cliques e interações do arquivo) e clique em **Liberar para o cliente**.
+3. O cliente vê o cronograma na área exclusiva dele e pode **aprovar o cronograma** ou **pedir ajuste** com um comentário. O pedido aparece para a Vie na visão geral e na página Aprovação.
+4. Precisa corrigir? **Substituir HTML**: o cliente passa a ver a nova versão, que volta a esperar aprovação.
+
+Regras do arquivo: um único `.html` de até 4 MB (imagens dentro do arquivo ou em links externos). O HTML roda isolado do portal: ele não consegue acessar a sessão nem os dados de ninguém, e só abre para quem tem acesso àquele cliente. Assim, não fica mais um link público como no Netlify.
+
+### Fluxo de um mês montado no portal
 
 1. Na **linha editorial**, preencha os pilares e a **frequência do feed** (dia, horário, formato, pilar).
 2. No **cronograma** do mês, clique em **Montar mês pela linha editorial**: o portal cria os conteúdos nos dias certos e puxa as ideias ainda não usadas do banco, do mesmo pilar e formato.

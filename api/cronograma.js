@@ -1,10 +1,13 @@
 import {
-  handler, metodo, exigirAdmin, exigirAcessoCliente, HttpError, getRedis, keys, texto, mesValido, novoId,
+  handler, metodo, exigirAdmin, exigirAcessoCliente, HttpError, getRedis, keys, texto, mesValido, novoId, lerCorpoBruto,
 } from '../lib/base.js';
+import { salvarArquivo, lerArquivo, apagarArquivo } from '../lib/arquivos.js';
 import { FORMATOS, STATUS, STATUS_DO_CLIENTE, gerarEsqueleto } from '../public/js/regras.js';
 
 // Cronograma mensal: cada mês é um documento com os conteúdos (feed e stories).
 // O cliente só enxerga o mês depois que a Vie publica.
+// O mês também pode ter um "cronograma interativo": um arquivo HTML pronto,
+// feito pela equipe, que aparece dentro do portal.
 export default handler(async (req, res, usuario) => {
   metodo(req, 'GET', 'POST');
   const clienteId = String(req.query.cliente || '');
@@ -17,13 +20,51 @@ export default handler(async (req, res, usuario) => {
     const docs = await Promise.all(meses.map((m) => redis.get(keys.cronograma(clienteId, m))));
     const lista = docs.filter(Boolean)
       .filter((d) => admin || d.status === 'publicado')
-      .map((d) => ({ mes: d.mes, status: d.status, total: d.posts.length, porStatus: contar(d.posts) }));
+      .map((d) => ({
+        mes: d.mes,
+        status: d.status,
+        total: d.posts.length,
+        porStatus: contar(d.posts),
+        interativo: !!d.interativo,
+        aprovacaoMes: d.interativo ? d.aprovacaoMes?.status || 'aguardando' : null,
+      }));
     return res.status(200).json(lista);
   }
 
   const mes = mesValido(req.query.mes);
   const chave = keys.cronograma(clienteId, mes);
   const doc = (await redis.get(chave)) || { mes, status: 'rascunho', foco: '', observacoes: '', posts: [] };
+
+  if (req.method === 'GET' && req.query.interativo) {
+    if (!admin && doc.status !== 'publicado') throw new HttpError(403, 'Este cronograma ainda não foi liberado.');
+    if (!doc.interativo) throw new HttpError(404, 'Este mês não tem cronograma interativo.');
+    const arquivo = await lerArquivo(doc.interativo.arquivoId);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    // O HTML roda isolado do portal: não acessa a sessão nem os dados de ninguém,
+    // mesmo se for aberto direto numa aba.
+    res.setHeader('Content-Security-Policy', 'sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals allow-downloads');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.status(200).send(arquivo.conteudo);
+  }
+
+  if (req.method === 'POST' && req.query.interativo) {
+    exigirAdmin(usuario);
+    const conteudo = await lerCorpoBruto(req);
+    if (!conteudo.length) throw new HttpError(400, 'Arquivo vazio.');
+    if (conteudo.length > 4 * 1024 * 1024) throw new HttpError(413, 'Arquivo acima de 4 MB. Deixe as imagens fora do HTML (com links) ou comprima-as.');
+    if (!/<html|<!doctype html|<body|<div/i.test(conteudo.subarray(0, 5000).toString('utf8'))) {
+      throw new HttpError(400, 'Envie o arquivo .html do cronograma.');
+    }
+    const nome = texto(req.query.nome || 'cronograma.html', 150).replace(/[^\w.\- ()À-ú]/g, '_');
+    const arquivoId = await salvarArquivo(clienteId, nome, 'text/html', conteudo);
+    if (doc.interativo) await apagarArquivo(doc.interativo.arquivoId);
+    doc.interativo = { arquivoId, nome, tamanho: conteudo.length, enviadoEm: new Date().toISOString(), enviadoPor: usuario.nome };
+    doc.aprovacaoMes = null; // versão nova volta a esperar a aprovação do cliente
+    doc.atualizadoEm = doc.interativo.enviadoEm;
+    await redis.set(chave, doc);
+    await redis.sadd(keys.meses(clienteId), mes);
+    return res.status(200).json(doc);
+  }
 
   if (req.method === 'GET') {
     if (admin) return res.status(200).json(doc);
@@ -58,6 +99,31 @@ export default handler(async (req, res, usuario) => {
         doc.posts[i] = { ...limpo, comentarios: anterior.comentarios || [], statusPor: anterior.status === limpo.status ? anterior.statusPor : undefined };
       }
       else doc.posts.push({ ...limpo, comentarios: [] });
+      break;
+    }
+
+    case 'remover-interativo':
+      exigirAdmin(usuario);
+      if (doc.interativo) await apagarArquivo(doc.interativo.arquivoId);
+      delete doc.interativo;
+      doc.aprovacaoMes = null;
+      break;
+
+    // Aprovação do mês inteiro (usada no cronograma interativo).
+    case 'aprovar-mes':
+    case 'ajuste-mes': {
+      if (!admin && doc.status !== 'publicado') throw new HttpError(403, 'Este cronograma ainda não foi liberado.');
+      const comentario = String(corpo.comentario || '').trim();
+      if (corpo.acao === 'ajuste-mes' && !comentario) throw new HttpError(400, 'Conte o que você gostaria de ajustar.');
+      doc.aprovacaoMes = { status: corpo.acao === 'aprovar-mes' ? 'aprovado' : 'ajuste', ...assinatura };
+      if (comentario) doc.conversa = [...(doc.conversa || []), { id: novoId('c'), texto: texto(comentario, 2000), ...assinatura }];
+      break;
+    }
+
+    case 'comentar-mes': {
+      if (!admin && doc.status !== 'publicado') throw new HttpError(403, 'Este cronograma ainda não foi liberado.');
+      if (!String(corpo.texto || '').trim()) throw new HttpError(400, 'Escreva o comentário.');
+      doc.conversa = [...(doc.conversa || []), { id: novoId('c'), texto: texto(corpo.texto, 2000), ...assinatura }];
       break;
     }
 

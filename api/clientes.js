@@ -50,6 +50,8 @@ export default handler(async (req, res, usuario) => {
   const usuarios = Object.values((await redis.hgetall(keys.usuarios)) || {}).filter((u) => u.clienteId === id);
   const { apagarArquivo } = await import('../lib/arquivos.js');
   await Promise.all(docs.filter((d) => d.arquivoId).map((d) => apagarArquivo(d.arquivoId)));
+  const crons = await Promise.all(meses.map((m) => redis.get(keys.cronograma(id, m))));
+  await Promise.all(crons.filter((c) => c?.interativo).map((c) => apagarArquivo(c.interativo.arquivoId)));
   await redis.del(
     keys.editorial(id), keys.ideias(id), keys.metricas(id), keys.documentos(id), keys.meses(id),
     ...meses.map((m) => keys.cronograma(id, m)),
@@ -82,6 +84,8 @@ async function resumo(clienteId, mes) {
     mes,
     cronograma: doc ? doc.status : null,
     total: posts.length,
+    interativo: !!doc?.interativo,
+    aprovacaoMes: doc?.interativo ? doc.aprovacaoMes?.status || 'aguardando' : null,
     porStatus,
     seguidores: ultimoMes ? metricas[ultimoMes].seguidores : null,
     metricasMes: ultimoMes || null,

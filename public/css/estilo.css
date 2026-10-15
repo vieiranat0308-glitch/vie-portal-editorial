@@ -474,3 +474,4 @@ textarea.entrada { resize: vertical; min-height: 84px; line-height: 1.5; }
 .linha-post .tags { display: flex; flex-wrap: wrap; gap: 6px; align-content: center; }
 .linha-post .tags .etq { white-space: normal; }
 .bloco-feed .capa { padding-right: 18px; }
+.quadro-interativo { width: 100%; height: max(640px, calc(100vh - 140px)); border: 1px solid var(--line); border-radius: var(--r); background: #fff; display: block; }

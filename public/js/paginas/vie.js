@@ -31,8 +31,10 @@ export async function render(el, ctx) {
 
   function desenhar(clientes) {
     const soma = (k) => clientes.reduce((s, c) => s + (c.resumo.porStatus[k] || 0), 0);
-    const semCronograma = clientes.filter((c) => !c.resumo.total).length;
-    const rascunhos = clientes.filter((c) => c.resumo.total && c.resumo.cronograma !== 'publicado').length;
+    const temCronograma = (c) => c.resumo.total || c.resumo.interativo;
+    const semCronograma = clientes.filter((c) => !temCronograma(c)).length;
+    const rascunhos = clientes.filter((c) => temCronograma(c) && c.resumo.cronograma !== 'publicado').length;
+    const mesesEm = (st) => clientes.filter((c) => c.resumo.cronograma === 'publicado' && c.resumo.aprovacaoMes === st).length;
     el.innerHTML = `
       <section class="saudacao">
         <h1>${saudacao()}, ${esc(ctx.usuario.nome.split(' ')[0])}</h1>
@@ -41,8 +43,8 @@ export async function render(el, ctx) {
       <div class="resumo-vie">
         <div class="cartao"><div class="numero-grande">${clientes.length}</div><div class="rot">Clientes</div></div>
         <div class="cartao"><div class="numero-grande">${num(clientes.reduce((s, c) => s + c.resumo.total, 0))}</div><div class="rot">Conteúdos no mês</div></div>
-        <div class="cartao"><div class="numero-grande" style="color:var(--s-ajuste)">${soma('ajuste')}</div><div class="rot">Ajustes pedidos</div></div>
-        <div class="cartao"><div class="numero-grande" style="color:var(--s-aprovacao)">${soma('aprovacao')}</div><div class="rot">Com o cliente para aprovar</div></div>
+        <div class="cartao"><div class="numero-grande" style="color:var(--s-ajuste)">${soma('ajuste') + mesesEm('ajuste')}</div><div class="rot">Ajustes pedidos</div></div>
+        <div class="cartao"><div class="numero-grande" style="color:var(--s-aprovacao)">${soma('aprovacao') + mesesEm('aguardando')}</div><div class="rot">Com o cliente para aprovar</div></div>
         <div class="cartao"><div class="numero-grande" style="color:var(--s-aprovado)">${soma('aprovado') + soma('gravado') + soma('postado')}</div><div class="rot">Aprovados</div></div>
       </div>
       ${clientes.length ? `<div class="grade-clientes">${clientes.map((c) => cartao(c)).join('')}</div>` : `
@@ -51,16 +53,19 @@ export async function render(el, ctx) {
 
   function cartao(c) {
     const r = c.resumo;
-    const estado = !r.total ? ['Sem cronograma', 'var(--muted)'] : r.cronograma === 'publicado' ? ['Liberado', 'var(--s-aprovado)'] : ['Rascunho', 'var(--s-aprovacao)'];
+    const estado = !r.total && !r.interativo ? ['Sem cronograma', 'var(--muted)'] : r.cronograma === 'publicado' ? ['Liberado', 'var(--s-aprovado)'] : ['Rascunho', 'var(--s-aprovacao)'];
     return `
       <a class="cartao cartao-cliente" style="--cor:${esc(c.cor)}" href="#/c/${encodeURIComponent(c.id)}">
         <div>
           <div class="nome">${esc(c.nome)}</div>
           <div class="muted" style="font-size:13.5px;margin-top:4px">${esc([c.especialidade, c.instagram ? `@${c.instagram}` : ''].filter(Boolean).join(' · '))}</div>
         </div>
-        <div class="linha-info"><span>${esc(nomeDoMes(mes, { curto: true }))} · ${r.total} conteúdos</span><span class="etq" style="--cor:${estado[1]}"><span class="ponto"></span>${estado[0]}</span></div>
+        <div class="linha-info"><span>${esc(nomeDoMes(mes, { curto: true }))} · ${r.interativo && !r.total ? 'cronograma interativo' : `${r.total} conteúdos`}</span><span class="etq" style="--cor:${estado[1]}"><span class="ponto"></span>${estado[0]}</span></div>
         <div class="barra-empilhada">${Object.entries(STATUS).map(([k, s]) => (r.porStatus[k] ? `<span style="flex:${r.porStatus[k]};--cor:${s.cor}" title="${s.nome}: ${r.porStatus[k]}"></span>` : '')).join('')}</div>
         <div class="alertas">
+          ${r.cronograma === 'publicado' && r.aprovacaoMes === 'ajuste' ? '<span class="etq cheia" style="--cor:var(--s-ajuste)">Ajuste pedido no cronograma</span>' : ''}
+          ${r.cronograma === 'publicado' && r.aprovacaoMes === 'aguardando' ? '<span class="etq cheia" style="--cor:var(--s-aprovacao)">Cronograma para aprovar</span>' : ''}
+          ${r.cronograma === 'publicado' && r.aprovacaoMes === 'aprovado' ? '<span class="etq cheia" style="--cor:var(--s-aprovado)">Cronograma aprovado</span>' : ''}
           ${r.porStatus.ajuste ? `<span class="etq cheia" style="--cor:var(--s-ajuste)">${r.porStatus.ajuste} ${r.porStatus.ajuste === 1 ? 'ajuste pedido' : 'ajustes pedidos'}</span>` : ''}
           ${r.porStatus.aprovacao ? `<span class="etq cheia" style="--cor:var(--s-aprovacao)">${r.porStatus.aprovacao} para aprovar</span>` : ''}
           ${r.seguidores != null ? `<span class="etq">${num(r.seguidores)} seguidores</span>` : ''}

@@ -39,7 +39,10 @@ export async function render(el, ctx) {
     if (mes === mesAtual()) frases.push(deHoje.length ? `Hoje ${deHoje.length === 1 ? 'tem 1 conteúdo' : `tem ${deHoje.length} conteúdos`} no cronograma` : 'Hoje não tem conteúdo de feed no cronograma');
     if (admin && ajustes) frases.push(`${ajustes} ${ajustes === 1 ? 'ajuste pedido' : 'ajustes pedidos'} pelo cliente`);
     if (!admin && paraAprovar) frases.push(`${paraAprovar} ${paraAprovar === 1 ? 'conteúdo esperando' : 'conteúdos esperando'} a sua aprovação`);
-    if (admin && doc.status === 'rascunho') frases.push(posts.length ? 'o cronograma deste mês ainda está em rascunho, o cliente não vê' : 'o cronograma deste mês ainda não foi montado');
+    const apMes = doc.interativo ? doc.aprovacaoMes?.status || 'aguardando' : null;
+    if (!admin && apMes === 'aguardando') frases.push(`o cronograma de ${nomeDoMes(mes).split(' ')[0].toLowerCase()} está esperando a sua aprovação`);
+    if (admin && doc.status === 'publicado' && apMes === 'ajuste') frases.push('o cliente pediu ajuste no cronograma do mês');
+    if (admin && doc.status === 'rascunho') frases.push(posts.length || doc.interativo ? 'o cronograma deste mês ainda está em rascunho, o cliente não vê' : 'o cronograma deste mês ainda não foi montado');
 
     const porStatus = Object.fromEntries(Object.keys(STATUS).map((k) => [k, posts.filter((p) => p.status === k).length]));
     const porFormato = Object.fromEntries(Object.keys(FORMATOS).map((k) => [k, posts.filter((p) => p.formato === k).length]));
@@ -116,6 +119,15 @@ export async function render(el, ctx) {
           <div class="cartao">
             <div class="cab"><h3>Próximos conteúdos</h3><a class="btn claro peq" style="margin-left:auto" href="#${ctx.base}/cronograma/${mes}">Ver mês</a></div>
             ${!disponivel ? `<div class="vazio"><strong>Em preparação</strong>O cronograma de ${esc(nomeDoMes(mes))} está sendo finalizado pela equipe Vie.</div>`
+              : doc.interativo && !posts.length ? `
+                <div class="objetivo" style="background:var(--acc-soft);border-color:transparent">
+                  <div style="flex:1">
+                    <span class="mono">Cronograma interativo</span>
+                    <p class="serif">O cronograma de ${esc(nomeDoMes(mes).toLowerCase())} está pronto.</p>
+                    <p class="muted" style="font-size:13.5px;margin-top:4px">${apMes === 'aprovado' ? 'Aprovado ✓' : apMes === 'ajuste' ? 'Ajuste pedido: a equipe Vie está revisando.' : admin ? 'Esperando a aprovação do cliente.' : 'Dê uma olhada e aprove ou peça ajuste.'}</p>
+                  </div>
+                  <a class="btn acc" href="#${ctx.base}/cronograma/${mes}">Abrir cronograma</a>
+                </div>`
               : proximos.length ? `<div class="lista-conteudos">${proximos.map((p) => itemConteudo(p, hoje)).join('')}</div>`
               : `<div class="vazio">${posts.length ? 'Todos os conteúdos deste mês já passaram.' : 'Nenhum conteúdo neste mês ainda.'}</div>`}
           </div>
