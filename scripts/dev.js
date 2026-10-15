@@ -11,7 +11,7 @@ process.env.ADMIN_EMAIL ||= 'admin@vie.local';
 process.env.ADMIN_PASSWORD ||= 'vie12345';
 process.env.ADMIN_NOME ||= 'Natalia';
 
-const tipos = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
+const tipos = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
 
 http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${porta}`);

@@ -17,6 +17,14 @@ Portal da **consultoria editorial** da Vie Company. A equipe Vie acompanha todos
 
 **Isolamento entre clientes:** toda checagem de permissão acontece no servidor (`lib/base.js → exigirAcessoCliente`). Um cliente só consegue ler os dados do próprio cliente, não vê meses em rascunho nem as notas internas da Vie. Os arquivos nunca ficam com link público: o download passa pela API, que confere quem está pedindo.
 
+### Linha editorial em PDF
+
+A estratégia que já está pronta em PDF (feita no Canva, por exemplo) pode ser enviada direto: abra o cliente → **Linha editorial** → **Subir PDF pronto**. O cliente vê todas as páginas dentro do portal (também no celular), com **Abrir em tela cheia** e **Baixar**. Para trocar, use **Substituir PDF**.
+
+- Limite de 4 MB por arquivo. No Canva, exporte como “PDF padrão” se o “para impressão” ficar maior.
+- Se o cliente também tiver a versão preenchida no portal, aparecem duas abas: “Estratégia em PDF” (primeiro) e “Versão web”. A versão web continua sendo a fonte dos pilares e da frequência usados no cronograma.
+- O leitor de PDF (PDF.js, licença Apache 2.0) fica dentro do projeto em `public/vendor/pdfjs/`, sem depender de serviço externo.
+
 ### Cronograma pronto (HTML interativo)
 
 Se o cronograma do mês é feito fora do portal (como os sites que vocês publicavam no Netlify), dá para **subir o arquivo .html pronto**:

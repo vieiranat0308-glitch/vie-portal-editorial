@@ -1,7 +1,8 @@
 // Linha editorial: leitura em formato de documento e editor estruturado (Vie).
-import { api, esc, aviso, falhou, icones, iniciais } from '../ui.js';
+import { api, esc, aviso, falhou, abrirCamada, confirmar, icones, iniciais } from '../ui.js';
 import { FORMATOS, DIAS_SEMANA, corDoPilar } from '../regras.js';
 import { formularioSecao } from '../componentes/formulario.js';
+import { mostrarPdf } from '../componentes/leitor-pdf.js';
 
 // Estrutura do editor: cada seção vira uma aba com seus campos.
 const SECOES = [
@@ -92,18 +93,94 @@ export async function render(el, ctx) {
   leitura(el, ctx, editorial);
 }
 
-function leitura(el, ctx, e) {
-  const { cliente, admin } = ctx;
-  ctx.topo('Geral', 'Linha editorial', `
-    <button class="btn claro" onclick="window.print()">${icones.imprimir}Imprimir / PDF</button>
-    ${admin ? `<a class="btn" href="#${ctx.base}/linha/editar">${icones.editar}Editar</a>` : ''}`);
+const temVersaoWeb = (e) => Object.keys(e).some((k) => !['atualizadoEm', 'pdf'].includes(k));
 
-  const pilares = e.pilares || [];
-  const vazio = !Object.keys(e).filter((k) => k !== 'atualizadoEm').length;
-  if (vazio) {
-    el.innerHTML = `<div class="vazio"><strong>Linha editorial em construção</strong>${admin ? 'Clique em “Editar” para preencher a estratégia deste cliente.' : 'A equipe Vie está finalizando a sua estratégia de conteúdo.'}</div>`;
+// A linha editorial pode vir como PDF pronto (subido pela Vie), como versão web
+// (preenchida no portal) ou as duas. Com as duas, o PDF aparece primeiro.
+function leitura(el, ctx, e, aba = e.pdf ? 'pdf' : 'web') {
+  const { admin } = ctx;
+  const web = temVersaoWeb(e);
+  const acoes = ctx.topo('Geral', 'Linha editorial', `
+    ${aba === 'web' && web ? `<button class="btn claro" onclick="window.print()">${icones.imprimir}Imprimir</button>` : ''}
+    ${admin ? `<button class="btn claro" data-subir-pdf>${icones.baixar}${e.pdf ? 'Substituir PDF' : 'Subir PDF pronto'}</button>
+      <a class="btn" href="#${ctx.base}/linha/editar">${icones.editar}${web ? 'Editar versão web' : 'Preencher pelo portal'}</a>` : ''}`);
+  acoes.querySelector('[data-subir-pdf]')?.addEventListener('click', () => subirPdf(el, ctx, e));
+
+  if (!e.pdf && !web) {
+    el.innerHTML = `<div class="vazio"><strong>Linha editorial em construção</strong>${admin
+      ? 'Suba o PDF da estratégia que já está pronto, ou preencha a linha editorial aqui no portal.<div style="display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap"><button class="btn acc" data-subir-pdf-vazio>Subir PDF pronto</button><a class="btn claro" href="#' + ctx.base + '/linha/editar">Preencher pelo portal</a></div>'
+      : 'A equipe Vie está finalizando a sua estratégia de conteúdo.'}</div>`;
+    el.querySelector('[data-subir-pdf-vazio]')?.addEventListener('click', () => subirPdf(el, ctx, e));
     return;
   }
+
+  const abas = e.pdf && web ? `
+    <div class="abas" role="tablist" style="margin-bottom:18px">
+      <button data-aba="pdf" class="${aba === 'pdf' ? 'ativo' : ''}">Estratégia em PDF</button>
+      <button data-aba="web" class="${aba === 'web' ? 'ativo' : ''}">Versão web</button>
+    </div>` : '';
+
+  if (aba === 'pdf' && e.pdf) {
+    const src = `/api/editorial?cliente=${encodeURIComponent(ctx.cliente.id)}&pdf=1&v=${encodeURIComponent(e.pdf.enviadoEm)}`;
+    el.innerHTML = `
+      ${abas}
+      <div class="doc-item" style="margin-bottom:14px">
+        <span class="icone-doc">PDF</span>
+        <div style="min-width:0">
+          <div class="nome">${esc(e.pdf.nome)}</div>
+          <div class="info">Enviado em ${esc(new Date(e.pdf.enviadoEm).toLocaleDateString('pt-BR'))} · ${(e.pdf.tamanho / 1024 / 1024).toFixed(1)} MB</div>
+        </div>
+        <div class="acoes">
+          <a class="btn claro peq" href="${src}" target="_blank" rel="noopener">${icones.link}Abrir em tela cheia</a>
+          <a class="btn claro peq" href="${src}&baixar=1">${icones.baixar}Baixar</a>
+          ${admin ? `<button class="btn-icone" data-remover-pdf title="Remover PDF">${icones.lixo}</button>` : ''}
+        </div>
+      </div>
+      <div class="leitor-pdf" data-leitor></div>`;
+    mostrarPdf(el.querySelector('[data-leitor]'), src);
+    el.querySelector('[data-remover-pdf]')?.addEventListener('click', async () => {
+      if (!(await confirmar('O PDF da linha editorial será removido do portal deste cliente.', { botao: 'Remover', perigo: true }))) return;
+      try {
+        const novo = await api(`editorial?cliente=${encodeURIComponent(ctx.cliente.id)}&pdf=1`, { metodo: 'DELETE' });
+        ctx.definirEditorial(novo);
+        leitura(el, ctx, novo);
+      } catch (err) { falhou(err); }
+    });
+  } else {
+    versaoWeb(el, ctx, e);
+    if (abas) el.insertAdjacentHTML('afterbegin', abas);
+  }
+  el.querySelectorAll('[data-aba]').forEach((b) => { b.onclick = () => leitura(el, ctx, e, b.dataset.aba); });
+}
+
+function subirPdf(el, ctx, e) {
+  const m = abrirCamada(`
+    <h2>${e.pdf ? 'Substituir o PDF' : 'Subir a linha editorial em PDF'}</h2>
+    <p class="muted">O PDF aparece na aba Linha editorial, só para ${esc(ctx.cliente.nome)}, com opção de abrir em tela cheia e baixar.</p>
+    <label class="campo"><span>Arquivo PDF (até 4 MB)</span><input class="entrada" type="file" accept="application/pdf,.pdf"></label>
+    <p class="muted" style="font-size:13px">Se o arquivo do Canva passar de 4 MB, exporte como “PDF padrão” em vez de “PDF para impressão”.</p>
+    <div class="rodape-modal"><button class="btn claro" data-fechar>Cancelar</button><button class="btn acc" data-ok>Enviar</button></div>`);
+  m.el.querySelector('[data-ok]').onclick = async (ev) => {
+    const f = m.el.querySelector('input[type=file]').files[0];
+    if (!f) return aviso('Escolha o arquivo.', { erro: true });
+    if (f.size > 4 * 1024 * 1024) return aviso('PDF acima de 4 MB. Exporte como “PDF padrão” no Canva ou comprima o arquivo.', { erro: true });
+    ev.target.disabled = true;
+    try {
+      const novo = await api(`editorial?cliente=${encodeURIComponent(ctx.cliente.id)}&pdf=1&nome=${encodeURIComponent(f.name)}`, { metodo: 'POST', arquivo: f });
+      ctx.definirEditorial(novo);
+      m.fechar();
+      aviso('PDF enviado. O cliente já vê na aba Linha editorial.');
+      leitura(el, ctx, novo, 'pdf');
+    } catch (err) {
+      falhou(err);
+      ev.target.disabled = false;
+    }
+  };
+}
+
+function versaoWeb(el, ctx, e) {
+  const { cliente } = ctx;
+  const pilares = e.pilares || [];
 
   const secoes = [];
   const add = (id, nome, html) => { if (html) secoes.push({ id, nome, html }); };

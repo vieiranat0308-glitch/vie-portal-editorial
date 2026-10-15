@@ -92,7 +92,7 @@ function novoCliente(ctx) {
       m.fechar();
       ctx.limparClientes();
       aviso('Cliente cadastrado.');
-      ctx.ir(`/c/${encodeURIComponent(c.id)}${corpo.exemplo ? '/linha' : '/linha/editar'}`);
+      ctx.ir(`/c/${encodeURIComponent(c.id)}/linha`);
     } catch (err) { falhou(err); }
   };
   m.el.querySelector('[data-ok]').onclick = () => criar(Object.fromEntries(new FormData(m.el.querySelector('[data-form]'))));

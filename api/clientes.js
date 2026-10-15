@@ -50,6 +50,8 @@ export default handler(async (req, res, usuario) => {
   const usuarios = Object.values((await redis.hgetall(keys.usuarios)) || {}).filter((u) => u.clienteId === id);
   const { apagarArquivo } = await import('../lib/arquivos.js');
   await Promise.all(docs.filter((d) => d.arquivoId).map((d) => apagarArquivo(d.arquivoId)));
+  const editorial = await redis.get(keys.editorial(id));
+  if (editorial?.pdf) await apagarArquivo(editorial.pdf.arquivoId);
   const crons = await Promise.all(meses.map((m) => redis.get(keys.cronograma(id, m))));
   await Promise.all(crons.filter((c) => c?.interativo).map((c) => apagarArquivo(c.interativo.arquivoId)));
   await redis.del(

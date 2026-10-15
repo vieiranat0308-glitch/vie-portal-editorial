@@ -506,3 +506,6 @@ textarea.entrada { resize: vertical; min-height: 84px; line-height: 1.5; }
 .ideia .gancho { font-style: normal; }
 .linha-post .gancho { font-style: normal; }
 .tela-login .arte h1 { color: var(--creme); }
+.leitor-pdf { display: grid; gap: 14px; }
+.folha-pdf { width: 100%; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: var(--sombra); }
+.folha-pdf canvas { display: block; width: 100%; height: auto; }
