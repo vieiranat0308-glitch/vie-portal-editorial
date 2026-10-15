@@ -155,8 +155,7 @@ export async function render(el, ctx) {
           <div class="prints-form" data-prints></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
             <label class="btn claro peq" style="cursor:pointer">${icones.baixar}Adicionar print<input type="file" accept="image/png,image/jpeg,image/webp" hidden data-arquivo></label>
-            <button class="btn claro peq" type="button" data-ler-print ${prints.length ? '' : 'disabled'}>Preencher pelo print</button>
-            <span class="muted" style="font-size:12.5px">Lê os números, a bio e os destaques do print. Confira antes de salvar.</span>
+            <span class="muted" style="font-size:12.5px">PNG ou JPG, até 4 MB. Pode subir mais de um.</span>
           </div>
         </div>
         <label class="campo"><span>Data do registro</span><input class="entrada" type="date" name="data" value="${esc(r.data)}"></label>
@@ -177,7 +176,6 @@ export async function render(el, ctx) {
         ? prints.map((p) => `<span class="print-form"><img src="${urlImagem(p)}" alt="Print"><button type="button" class="btn-icone" data-tirar="${p}" title="Remover">${icones.fechar}</button></span>`).join('')
         : '<p class="muted" style="font-size:13px">Nenhum print ainda.</p>';
       m.el.querySelectorAll('[data-tirar]').forEach((b) => { b.onclick = () => { prints = prints.filter((p) => p !== b.dataset.tirar); desenharPrints(); }; });
-      m.el.querySelector('[data-ler-print]').disabled = !prints.length;
     };
     desenharPrints();
 
@@ -191,23 +189,6 @@ export async function render(el, ctx) {
         prints.push(arquivoId);
         desenharPrints();
       } catch (err) { falhou(err); }
-    };
-
-    m.el.querySelector('[data-ler-print]').onclick = async (ev) => {
-      ev.target.disabled = true;
-      ev.target.textContent = 'Lendo o print…';
-      try {
-        const lido = await api(rota, { metodo: 'POST', corpo: { acao: 'ler-print', arquivoId: prints.at(-1) } });
-        if (lido.posts != null) campo('posts').value = lido.posts;
-        if (lido.seguidores != null) campo('seguidores').value = lido.seguidores;
-        if (lido.seguindo != null) campo('seguindo').value = lido.seguindo;
-        if (lido.bio) campo('bio').value = lido.bio;
-        if (lido.link) campo('link').value = lido.link;
-        if (lido.destaques?.length) campo('destaques').value = lido.destaques.join('\n');
-        aviso('Dados preenchidos pelo print. Confira antes de salvar.');
-      } catch (err) { falhou(err); }
-      ev.target.textContent = 'Preencher pelo print';
-      ev.target.disabled = !prints.length;
     };
 
     m.el.querySelector('[data-ok]').onclick = async () => {

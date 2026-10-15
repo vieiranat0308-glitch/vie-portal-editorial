@@ -88,21 +88,26 @@ export function ligarAprovacaoMes(el, { ctx, mes, aoMudar }) {
   });
 }
 
-// Lê os posts de dentro do HTML (com IA) e devolve o cronograma atualizado.
+// Lê de novo os posts do HTML já salvo (leitura do próprio portal, sem custo).
 export async function lerPostsDoHtml(ctx, mes) {
-  const aguarde = abrirCamada(`
-    <h2>Lendo o cronograma…</h2>
-    <p class="muted">Estou identificando os posts do HTML (datas, formatos, temas e pilares) para atualizar a visão geral. Leva cerca de 1 minuto.</p>`);
   try {
     const doc = await api(`cronograma?cliente=${encodeURIComponent(ctx.cliente.id)}&mes=${mes}`, { metodo: 'POST', corpo: { acao: 'ler-html' } });
-    aguarde.fechar();
-    const l = doc.leituraHtml;
-    aviso(`${l.total} ${l.total === 1 ? 'conteúdo encontrado' : 'conteúdos encontrados'} no HTML. A visão geral já está atualizada.`);
+    avisarLeitura(doc);
     ctx.atualizarContadores?.();
     return doc;
   } catch (err) {
-    aguarde.fechar();
     falhou(err);
     return null;
   }
+}
+
+export function avisarLeitura(doc) {
+  const l = doc.leituraHtml;
+  if (!l) return;
+  if (!l.total) {
+    aviso('Não encontrei posts neste HTML. Se ele estiver num formato diferente do modelo da Vie, me mande o arquivo para ajustar a leitura.', { erro: true });
+    return;
+  }
+  const feed = doc.posts.filter((p) => p.formato !== 'story').length;
+  aviso(`${l.total} conteúdos lidos do HTML (${feed} no feed e ${l.total - feed} de stories). A visão geral já está atualizada.`);
 }

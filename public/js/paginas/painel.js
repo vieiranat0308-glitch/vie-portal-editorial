@@ -47,7 +47,7 @@ export async function render(el, ctx) {
 
     const porStatus = Object.fromEntries(Object.keys(STATUS).map((k) => [k, posts.filter((p) => p.status === k).length]));
     const porFormato = Object.fromEntries(Object.keys(FORMATOS).map((k) => [k, posts.filter((p) => p.formato === k).length]));
-    const proximos = posts.filter((p) => p.data >= (mes === mesAtual() ? hoje : `${mes}-01`)).slice(0, 5);
+    const proximos = posts.filter((p) => p.formato !== 'story' && p.data >= (mes === mesAtual() ? hoje : `${mes}-01`)).slice(0, 5);
     const doDia = posts.filter((p) => p.data === selecionado);
 
     const serieSeg = mesesMetricas.slice(-8).map((k) => metricas[k].seguidores);

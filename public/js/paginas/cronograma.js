@@ -3,7 +3,7 @@
 import { api, esc, aviso, falhou, abrirCamada, confirmar, hojeISO, mesAtual, somarMes, dataObj, dataCurta, diaSemanaCurto, quando, icones, iniciais } from '../ui.js';
 import { FORMATOS, nomeDoMes, corDoPilar } from '../regras.js';
 import { abrirPost, etiquetaFormato, etiquetaPilar, etiquetaStatus } from '../componentes/post.js';
-import { faixaAprovacaoMes, ligarAprovacaoMes, lerPostsDoHtml } from '../componentes/aprovacao-mes.js';
+import { faixaAprovacaoMes, ligarAprovacaoMes, lerPostsDoHtml, avisarLeitura } from '../componentes/aprovacao-mes.js';
 
 let visaoSalva = 'calendario';
 
@@ -26,6 +26,8 @@ export async function render(el, ctx) {
   const editorial = await ctx.editorial();
   const pilares = editorial.pilares || [];
   let doc = await api(`cronograma?cliente=${id}&mes=${mes}`);
+  // Mês com cronograma em HTML abre direto nele.
+  if (doc.interativo) visao = 'interativo';
 
   const novo = (data) => abrirPost({ ctx, mes, post: { data, formato: 'reel', status: 'pauta' }, aoMudar: atualizar });
   acoes.querySelector('[data-novo]')?.addEventListener('click', () => novo(`${mes}-${mes === mesAtual() ? hojeISO().slice(8) : '01'}`));
@@ -141,8 +143,9 @@ export async function render(el, ctx) {
       enviarAcao({ acao: 'remover-interativo' });
     });
     ligarAprovacaoMes(el, { ctx, mes, aoMudar: atualizar });
+    ligarCaixinhas();
     el.querySelector('[data-reler-html]')?.addEventListener('click', async () => {
-      if (posts.length && !(await confirmar('Os conteúdos deste mês serão substituídos pelos que estão no HTML. O que já foi marcado como aprovado, gravado ou postado continua marcado.', { botao: 'Ler de novo' }))) return;
+      if (posts.some((p) => p.origem !== 'html') && !(await confirmar('Os conteúdos deste mês serão substituídos pelos que estão no HTML. O que já foi marcado como aprovado, gravado ou postado continua marcado.', { botao: 'Ler de novo' }))) return;
       const novo = await lerPostsDoHtml(ctx, mes);
       if (novo) atualizar(novo);
     });
@@ -161,6 +164,41 @@ export async function render(el, ctx) {
         m.fechar();
       };
     });
+  }
+
+  // Caixinhas Feito/Publicado/Usada do HTML <-> andamento salvo no portal.
+  let ouvinte;
+  let filaMarcacoes = Promise.resolve();
+  function estadoCaixinhas() {
+    const feitos = { ...(doc.marcasHtml || {}) };
+    (doc.posts || []).forEach((p) => { if (p.chaveHtml) feitos[p.chaveHtml] = p.status === 'postado'; });
+    return feitos;
+  }
+  function ligarCaixinhas() {
+    if (ouvinte) window.removeEventListener('message', ouvinte);
+    const quadro = el.querySelector('[data-html-cronograma]');
+    if (!quadro) return;
+    ouvinte = async (e) => {
+      if (!document.body.contains(quadro)) { window.removeEventListener('message', ouvinte); return; }
+      if (e.source !== quadro.contentWindow || !e.data) return;
+      if (e.data.tipo === 'vie-pronto') {
+        quadro.contentWindow.postMessage({ tipo: 'vie-estado', feitos: estadoCaixinhas() }, '*');
+      } else if (e.data.tipo === 'vie-marcar') {
+        const corpo = { acao: 'marcar-html', chave: String(e.data.chave), feito: !!e.data.feito };
+        // Uma marcação por vez, para cliques rápidos não se sobreporem.
+        filaMarcacoes = filaMarcacoes.then(async () => {
+          try {
+            // Atualiza sem redesenhar, para o cronograma não recarregar na tela.
+            doc = await api(`cronograma?cliente=${id}&mes=${mes}`, { metodo: 'POST', corpo });
+            ctx.atualizarContadores();
+          } catch (err) {
+            falhou(err);
+            quadro.contentWindow.postMessage({ tipo: 'vie-estado', feitos: estadoCaixinhas() }, '*');
+          }
+        });
+      }
+    };
+    window.addEventListener('message', ouvinte);
   }
 
   async function enviarAcao(corpo) {
@@ -187,10 +225,9 @@ export async function render(el, ctx) {
         visao = 'interativo';
         m.fechar();
         aviso(doc.status === 'publicado' ? 'Cronograma atualizado. O cliente já vê a nova versão.' : 'Cronograma enviado. Confira e clique em “Liberar para o cliente”.');
+        avisarLeitura(doc);
+        ctx.atualizarContadores();
         desenhar();
-        // Em seguida, lê os posts do HTML para atualizar a visão geral e o acompanhamento.
-        const lido = await lerPostsDoHtml(ctx, mes);
-        if (lido) atualizar(lido);
       } catch (err) {
         falhou(err);
         ev.target.disabled = false;
@@ -205,9 +242,9 @@ export async function render(el, ctx) {
     return `
       <div class="cartao" style="margin-bottom:16px;display:grid;gap:14px">
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-          <span class="muted" style="font-size:13px">Versão enviada em ${esc(quando(doc.interativo.enviadoEm))}${admin && l ? ` · ${l.total} ${l.total === 1 ? 'conteúdo lido' : 'conteúdos lidos'} para o acompanhamento${l.observacao ? ` (${esc(l.observacao)})` : ''}` : ''}${admin && !l ? ' · os posts ainda não foram lidos para o acompanhamento' : ''}</span>
+          <span class="muted" style="font-size:13px">Versão enviada em ${esc(quando(doc.interativo.enviadoEm))}${admin && l ? ` · ${l.total} ${l.total === 1 ? 'conteúdo lido' : 'conteúdos lidos'} para o acompanhamento` : ''}${admin && !l ? ' · os posts ainda não foram lidos para o acompanhamento' : ''}. ${admin ? 'O que for marcado como Feito, Publicado ou Usada no cronograma atualiza a visão geral.' : 'Marque Feito e Publicado aqui no cronograma: a equipe Vie acompanha pela visão geral.'}</span>
           <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
-            ${admin ? `<button class="btn ${l ? 'claro' : 'acc'} peq" data-reler-html>${l ? 'Ler os posts de novo' : 'Ler os posts do HTML'}</button>` : ''}
+            ${admin ? `<button class="btn claro peq" data-reler-html>${l ? 'Ler os posts de novo' : 'Ler os posts do HTML'}</button>` : ''}
             <a class="btn claro peq" href="${src}" target="_blank" rel="noopener">${icones.link}Abrir em tela cheia</a>
             ${admin ? `<button class="btn-icone" data-remover-html title="Remover arquivo">${icones.lixo}</button>` : ''}
           </span>
@@ -219,7 +256,7 @@ export async function render(el, ctx) {
           <button class="btn claro" data-comentar-mes>Enviar</button>
         </div>
       </div>
-      <iframe class="quadro-interativo" src="${src}" title="Cronograma interativo de ${esc(nomeDoMes(mes))}"
+      <iframe class="quadro-interativo" data-html-cronograma src="${src}&portal=1" title="Cronograma interativo de ${esc(nomeDoMes(mes))}"
         sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals allow-downloads"></iframe>`;
   }
 

@@ -2,7 +2,6 @@ import {
   handler, metodo, exigirAdmin, exigirAcessoCliente, HttpError, getRedis, keys, texto, novoId, lerCorpoBruto,
 } from '../lib/base.js';
 import { salvarArquivo, lerArquivo, apagarArquivo } from '../lib/arquivos.js';
-import { lerPerfilDoPrint } from '../lib/ia.js';
 
 const TIPOS_IMAGEM = ['image/png', 'image/jpeg', 'image/webp'];
 const LIMITE = 4 * 1024 * 1024;
@@ -45,12 +44,6 @@ export default handler(async (req, res, usuario) => {
 
   const corpo = req.body || {};
   switch (corpo.acao) {
-    case 'ler-print': {
-      const arquivo = await lerArquivo(String(corpo.arquivoId || ''));
-      if (arquivo.clienteId && arquivo.clienteId !== clienteId) throw new HttpError(404, 'Imagem não encontrada.');
-      return res.status(200).json(await lerPerfilDoPrint({ imagem: arquivo.conteudo, tipo: arquivo.tipo }));
-    }
-
     case 'salvar': {
       const r = limpar(corpo.registro || {});
       const i = registros.findIndex((x) => x.id === r.id);

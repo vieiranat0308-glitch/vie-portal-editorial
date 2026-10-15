@@ -2,7 +2,7 @@ import {
   handler, metodo, exigirAdmin, exigirAcessoCliente, HttpError, getRedis, keys, texto, mesValido, novoId, lerCorpoBruto,
 } from '../lib/base.js';
 import { salvarArquivo, lerArquivo, apagarArquivo } from '../lib/arquivos.js';
-import { lerPostsDoHtml } from '../lib/ia.js';
+import { lerCronogramaHtml, SCRIPT_PONTE } from '../lib/cronograma-html.js';
 import { FORMATOS, STATUS, STATUS_DO_CLIENTE, gerarEsqueleto } from '../public/js/regras.js';
 
 // Cronograma mensal: cada mês é um documento com os conteúdos (feed e stories).
@@ -40,12 +40,19 @@ export default handler(async (req, res, usuario) => {
     if (!admin && doc.status !== 'publicado') throw new HttpError(403, 'Este cronograma ainda não foi liberado.');
     if (!doc.interativo) throw new HttpError(404, 'Este mês não tem cronograma interativo.');
     const arquivo = await lerArquivo(doc.interativo.arquivoId);
+    let html = arquivo.conteudo;
+    // Dentro do portal, liga as caixinhas Feito/Publicado/Usada do HTML ao andamento salvo.
+    if (req.query.portal) {
+      const t = html.toString('utf8');
+      const fim = t.search(/<\/body>/i);
+      html = Buffer.from(fim >= 0 ? t.slice(0, fim) + SCRIPT_PONTE + t.slice(fim) : t + SCRIPT_PONTE, 'utf8');
+    }
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     // O HTML roda isolado do portal: não acessa a sessão nem os dados de ninguém,
     // mesmo se for aberto direto numa aba.
     res.setHeader('Content-Security-Policy', 'sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals allow-downloads');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    return res.status(200).send(arquivo.conteudo);
+    return res.status(200).send(html);
   }
 
   if (req.method === 'POST' && req.query.interativo) {
@@ -61,6 +68,8 @@ export default handler(async (req, res, usuario) => {
     if (doc.interativo) await apagarArquivo(doc.interativo.arquivoId);
     doc.interativo = { arquivoId, nome, tamanho: conteudo.length, enviadoEm: new Date().toISOString(), enviadoPor: usuario.nome };
     doc.aprovacaoMes = null; // versão nova volta a esperar a aprovação do cliente
+    const editorial = await redis.get(keys.editorial(clienteId));
+    aplicarLeitura(doc, lerCronogramaHtml(conteudo.toString('utf8'), mes), editorial?.pilares || [], new Date().toISOString());
     doc.atualizadoEm = doc.interativo.enviadoEm;
     await redis.set(chave, doc);
     await redis.sadd(keys.meses(clienteId), mes);
@@ -103,49 +112,29 @@ export default handler(async (req, res, usuario) => {
       break;
     }
 
-    // Lê os conteúdos de dentro do cronograma em HTML para alimentar a visão geral,
-    // o calendário e o acompanhamento (gravado/postado) de cada post.
+    // Lê de novo os posts do cronograma em HTML que já está salvo.
     case 'ler-html': {
       exigirAdmin(usuario);
       if (!doc.interativo) throw new HttpError(400, 'Suba o cronograma em HTML antes.');
       const [arquivo, editorial] = await Promise.all([lerArquivo(doc.interativo.arquivoId), redis.get(keys.editorial(clienteId))]);
-      const pilares = editorial?.pilares || [];
-      const lido = await lerPostsDoHtml({ html: arquivo.conteudo.toString('utf8'), mes, pilares });
-      const normal = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-      const pilarPorNome = new Map(pilares.map((p) => [normal(p.nome), p.id]));
-      const anteriores = new Map(doc.posts.map((p) => [`${p.data}|${p.formato}`, p]));
-      const aprovado = doc.aprovacaoMes?.status === 'aprovado';
-      const doMes = lido.posts.filter((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.data) && p.data.startsWith(`${mes}-`));
-      doc.posts = doMes.map((p) => {
-        const formato = FORMATOS[p.formato] ? p.formato : 'reel';
-        const antes = anteriores.get(`${p.data}|${formato}`);
-        // O andamento já marcado (aprovado, gravado, postado) continua valendo na versão nova.
-        const manter = antes && ['aprovado', 'gravado', 'postado'].includes(antes.status);
-        return {
-          id: antes?.id || novoId('p'),
-          data: p.data,
-          horario: texto(p.horario, 40),
-          formato,
-          pilarId: pilarPorNome.get(normal(p.pilar)) || null,
-          titulo: texto(p.titulo, 300),
-          gancho: texto(p.gancho, 2000),
-          roteiro: texto(p.roteiro, 10000),
-          legenda: texto(p.legenda, 5000),
-          referencias: antes?.referencias || [],
-          notaInterna: antes?.notaInterna || '',
-          status: manter ? antes.status : (aprovado ? 'aprovado' : 'pauta'),
-          statusPor: manter ? antes.statusPor : undefined,
-          comentarios: antes?.comentarios || [],
-          ideiaId: null,
-          origem: 'html',
-        };
-      });
-      doc.leituraHtml = {
-        em: assinatura.em,
-        total: doc.posts.length,
-        foraDoMes: lido.posts.length - doMes.length,
-        observacao: texto(lido.observacao, 500),
-      };
+      aplicarLeitura(doc, lerCronogramaHtml(arquivo.conteudo.toString('utf8'), mes), editorial?.pilares || [], assinatura.em);
+      break;
+    }
+
+    // Caixinha Feito/Publicado/Usada marcada dentro do cronograma em HTML.
+    case 'marcar-html': {
+      if (!admin && doc.status !== 'publicado') throw new HttpError(403, 'Este cronograma ainda não foi liberado.');
+      const chave = texto(corpo.chave, 40);
+      if (!/^[\w-]+$/.test(chave)) throw new HttpError(400, 'Caixinha inválida.');
+      doc.marcasHtml = { ...(doc.marcasHtml || {}), [chave]: !!corpo.feito };
+      const alvo = doc.posts.find((p) => p.chaveHtml === chave);
+      if (alvo) {
+        if (corpo.feito && alvo.status !== 'postado') { alvo.status = 'postado'; alvo.statusPor = assinatura; }
+        if (!corpo.feito && alvo.status === 'postado') {
+          alvo.status = doc.aprovacaoMes?.status === 'aprovado' ? 'aprovado' : 'pauta';
+          alvo.statusPor = assinatura;
+        }
+      }
       break;
     }
 
@@ -273,4 +262,43 @@ function limparPost(p, mes) {
     status: STATUS[p.status] ? p.status : 'pauta',
     ideiaId: p.ideiaId ? texto(p.ideiaId, 40) : null,
   };
+}
+
+// Troca os conteúdos do mês pelos lidos do HTML, mantendo o andamento já marcado.
+function aplicarLeitura(doc, lidos, pilares, quando) {
+  const [anoMes] = [doc.mes];
+  const normal = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const pilarPorNome = new Map(pilares.map((p) => [normal(p.nome), p.id]));
+  const anteriores = new Map(doc.posts.map((p) => [p.chaveHtml || `${p.data}|${p.formato}`, p]));
+  const aprovado = doc.aprovacaoMes?.status === 'aprovado';
+  const marcas = doc.marcasHtml || {};
+  const doMes = lidos.filter((p) => p.data.startsWith(`${anoMes}-`));
+  doc.posts = doMes.map((p) => {
+    const antes = anteriores.get(p.chaveHtml) || anteriores.get(`${p.data}|${p.formato}`);
+    // O andamento já marcado (aprovado, gravado, postado) continua valendo na versão nova.
+    const manter = antes && ['aprovado', 'gravado', 'postado'].includes(antes.status);
+    let status = manter ? antes.status : (aprovado ? 'aprovado' : 'pauta');
+    if (marcas[p.chaveHtml]) status = 'postado';
+    return {
+      id: antes?.id || novoId('p'),
+      chaveHtml: p.chaveHtml,
+      data: p.data,
+      horario: texto(p.horario, 40),
+      formato: FORMATOS[p.formato] ? p.formato : 'reel',
+      pilarId: pilarPorNome.get(normal(p.pilar)) || null,
+      titulo: texto(p.titulo, 300),
+      gancho: texto(p.gancho, 2000),
+      roteiro: texto(p.roteiro, 10000),
+      legenda: texto(p.legenda, 5000),
+      referencias: (p.referencias || []).slice(0, 20).map((r) => ({ rotulo: texto(r.rotulo, 80), url: texto(r.url, 1000) })),
+      notaInterna: antes?.notaInterna || '',
+      status,
+      statusPor: status === antes?.status ? antes?.statusPor : undefined,
+      comentarios: antes?.comentarios || [],
+      ideiaId: null,
+      origem: 'html',
+    };
+  });
+  doc.posts.sort((a, b) => (a.data + a.horario).localeCompare(b.data + b.horario));
+  doc.leituraHtml = { em: quando, total: doc.posts.length, foraDoMes: lidos.length - doMes.length };
 }

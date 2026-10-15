@@ -34,10 +34,12 @@ Se o cronograma do mês é feito fora do portal (como os sites que vocês public
 3. O cliente vê o cronograma na área exclusiva dele e pode **aprovar o cronograma** ou **pedir ajuste** com um comentário. O pedido aparece para a Vie na visão geral e na página Aprovação.
 4. Precisa corrigir? **Substituir HTML**: o cliente passa a ver a nova versão, que volta a esperar aprovação.
 
-Assim que o HTML sobe, o portal **lê os posts de dentro do arquivo** (data, formato, tema, pilar, gancho, roteiro e legenda) com o Claude e alimenta a visão geral, o calendário, os próximos conteúdos e o fluxo do mês. A leitura leva cerca de 1 minuto. Ao substituir o HTML, os posts são lidos de novo, e o que já estava marcado como aprovado, gravado ou postado continua marcado. Também dá para refazer a leitura em **Ler os posts de novo**.
+Assim que o HTML sobe, o portal **lê os posts de dentro do arquivo**, sem IA e sem custo nenhum. Ele entende o modelo de cronograma da Vie: cada post do feed (`<article class="post" data-k="f-DDMM">`) e cada dia de stories (`<article class="day" data-k="s-DDMM">`), com data, dia e horário, pilar, formato, título, gancho, roteiro e referências. Com isso, alimenta a visão geral, o calendário, os próximos conteúdos e o fluxo do mês. Ao substituir o HTML, o que já estava aprovado ou postado continua marcado. Também há o botão **Ler os posts de novo**.
 
-- A leitura precisa da variável **`ANTHROPIC_API_KEY`** na Vercel (a mesma chave da Spice Cronogramas serve). Modelo padrão: `claude-opus-5-5` (troque com `CLAUDE_MODEL`). Se o modelo recusar a leitura, a API tenta automaticamente outro modelo recomendado (`fallbacks: "default"`).
+**Caixinhas ligadas ao portal:** as caixinhas **Feito** (stories), **Publicado** (feed) e **Usada** (banco de ideias) do HTML ficam salvas no portal, e não só no navegador de quem marcou. Marcar **Feito** ou **Publicado** deixa o post como **Postado** na visão geral, e desmarcar volta para Aprovado. Quem abre o cronograma, em qualquer aparelho, vê as mesmas marcações.
+
 - Num mês em HTML, a aprovação é do **cronograma inteiro**: a faixa com **Aprovar cronograma** e **Pedir ajuste** aparece para o cliente na visão geral e na aba Cronograma. Aprovar o mês marca todos os posts como aprovados. A Vie pode **Marcar como aprovado** quando o cliente aprovar por outro canal.
+- Se um HTML vier em outro formato e nenhum post for encontrado, o portal avisa. O cronograma continua aparecendo normalmente, só não alimenta a visão geral.
 
 Regras do arquivo: um único `.html` de até 4 MB (imagens dentro do arquivo ou em links externos). O HTML roda isolado do portal: ele não consegue acessar a sessão nem os dados de ninguém, e só abre para quem tem acesso àquele cliente. Assim, não fica mais um link público como no Netlify.
 
@@ -90,7 +92,6 @@ Abre em `http://localhost:3000` com o login `admin@vie.local` / `vie12345`. Ness
 
 ## Próximos passos possíveis
 
-- Gerar o cronograma do mês com IA (como na Spice Cronogramas), a partir da linha editorial e das métricas.
 - Puxar as métricas direto do Instagram (Meta Graph API).
 - Aviso por e-mail ou WhatsApp quando há conteúdo para aprovar ou ajuste pedido.
 - Redefinição de senha por e-mail (hoje a Vie gera um novo convite).
