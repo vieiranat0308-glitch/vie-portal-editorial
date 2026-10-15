@@ -34,6 +34,11 @@ Se o cronograma do mês é feito fora do portal (como os sites que vocês public
 3. O cliente vê o cronograma na área exclusiva dele e pode **aprovar o cronograma** ou **pedir ajuste** com um comentário. O pedido aparece para a Vie na visão geral e na página Aprovação.
 4. Precisa corrigir? **Substituir HTML**: o cliente passa a ver a nova versão, que volta a esperar aprovação.
 
+Assim que o HTML sobe, o portal **lê os posts de dentro do arquivo** (data, formato, tema, pilar, gancho, roteiro e legenda) com o Claude e alimenta a visão geral, o calendário, os próximos conteúdos e o fluxo do mês. A leitura leva cerca de 1 minuto. Ao substituir o HTML, os posts são lidos de novo, e o que já estava marcado como aprovado, gravado ou postado continua marcado. Também dá para refazer a leitura em **Ler os posts de novo**.
+
+- A leitura precisa da variável **`ANTHROPIC_API_KEY`** na Vercel (a mesma chave da Spice Cronogramas serve). Modelo padrão: `claude-opus-5-5` (troque com `CLAUDE_MODEL`). Se o modelo recusar a leitura, a API tenta automaticamente outro modelo recomendado (`fallbacks: "default"`).
+- Num mês em HTML, a aprovação é do **cronograma inteiro**: a faixa com **Aprovar cronograma** e **Pedir ajuste** aparece para o cliente na visão geral e na aba Cronograma. Aprovar o mês marca todos os posts como aprovados. A Vie pode **Marcar como aprovado** quando o cliente aprovar por outro canal.
+
 Regras do arquivo: um único `.html` de até 4 MB (imagens dentro do arquivo ou em links externos). O HTML roda isolado do portal: ele não consegue acessar a sessão nem os dados de ninguém, e só abre para quem tem acesso àquele cliente. Assim, não fica mais um link público como no Netlify.
 
 ### Fluxo de um mês montado no portal

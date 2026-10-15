@@ -509,3 +509,5 @@ textarea.entrada { resize: vertical; min-height: 84px; line-height: 1.5; }
 .leitor-pdf { display: grid; gap: 14px; }
 .folha-pdf { width: 100%; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: var(--sombra); }
 .folha-pdf canvas { display: block; width: 100%; height: auto; }
+.faixa-aprovacao { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--cor); border-radius: 16px; padding: 16px 18px; margin-bottom: 18px; }
+.faixa-aprovacao b { font-weight: 600; }

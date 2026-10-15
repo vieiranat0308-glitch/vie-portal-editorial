@@ -10,6 +10,7 @@
     "dev": "DEV_MEMORIA=1 node scripts/dev.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.134.0",
     "@upstash/redis": "^1.39.0",
     "@vercel/blob": "^2.8.2"
   }

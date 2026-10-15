@@ -3,6 +3,7 @@
 import { api, esc, aviso, falhou, abrirCamada, confirmar, hojeISO, mesAtual, somarMes, dataObj, dataCurta, diaSemanaCurto, quando, icones, iniciais } from '../ui.js';
 import { FORMATOS, nomeDoMes, corDoPilar } from '../regras.js';
 import { abrirPost, etiquetaFormato, etiquetaPilar, etiquetaStatus } from '../componentes/post.js';
+import { faixaAprovacaoMes, ligarAprovacaoMes, lerPostsDoHtml } from '../componentes/aprovacao-mes.js';
 
 let visaoSalva = 'calendario';
 
@@ -56,6 +57,7 @@ export async function render(el, ctx) {
           ${!posts.length && !doc.interativo ? `<button class="btn claro peq" data-subir>${icones.baixar}Subir cronograma pronto (HTML)</button><button class="btn fantasma peq" data-esqueleto>Montar pela linha editorial</button>` : ''}
           <button class="btn acc peq" data-publicar ${posts.length || doc.interativo ? '' : 'disabled'}>Liberar para o cliente</button>
         </div>` : ''}
+      ${faixaAprovacaoMes({ ctx, doc, mes, linkCronograma: false })}
 
       <div class="faixa-mes">
         <div>
@@ -106,7 +108,7 @@ export async function render(el, ctx) {
         <h2>Liberar ${esc(nomeDoMes(mes))}</h2>
         <p>${esc(cliente.nome)} vai passar a ver o cronograma deste mês no portal.</p>
         ${doc.interativo ? '<p class="muted" style="font-size:14px">No cronograma interativo, o cliente pode aprovar o mês ou pedir ajuste com um comentário.</p>' : ''}
-        ${posts.length ? `<label class="opcoes-check"><label><input type="checkbox" checked data-pedir> Pedir aprovação dos conteúdos “Planejados”</label></label>
+        ${posts.length && !doc.interativo ? `<label class="opcoes-check"><label><input type="checkbox" checked data-pedir> Pedir aprovação dos conteúdos “Planejados”</label></label>
         <p class="muted" style="font-size:13px">Com essa opção, os conteúdos ficam como “Para aprovar” e o cliente aprova ou pede ajuste em cada um.</p>` : ''}
         <div class="rodape-modal"><button class="btn claro" data-fechar>Cancelar</button><button class="btn acc" data-ok>Liberar para o cliente</button></div>`);
       m.el.querySelector('[data-ok]').onclick = async () => {
@@ -138,23 +140,11 @@ export async function render(el, ctx) {
       if (!(await confirmar('O arquivo do cronograma interativo será removido deste mês.', { botao: 'Remover', perigo: true }))) return;
       enviarAcao({ acao: 'remover-interativo' });
     });
-    el.querySelector('[data-aprovar-mes]')?.addEventListener('click', async () => {
-      await enviarAcao({ acao: 'aprovar-mes' });
-      aviso('Cronograma aprovado. Obrigada!');
-    });
-    el.querySelector('[data-ajuste-mes]')?.addEventListener('click', () => {
-      const m = abrirCamada(`
-        <h2>O que você gostaria de ajustar?</h2>
-        <p class="muted">Conte quais dias ou conteúdos mudar. A equipe Vie devolve o cronograma ajustado.</p>
-        <textarea class="entrada" rows="5" autofocus placeholder="Ex.: trocar o tema do dia 12, já gravei o reel do dia 20…"></textarea>
-        <div class="rodape-modal"><button class="btn claro" data-fechar>Cancelar</button><button class="btn acc" data-ok>Enviar pedido</button></div>`);
-      m.el.querySelector('[data-ok]').onclick = async () => {
-        const comentario = m.el.querySelector('textarea').value.trim();
-        if (!comentario) return aviso('Conte rapidinho o que ajustar.', { erro: true });
-        m.fechar();
-        await enviarAcao({ acao: 'ajuste-mes', comentario });
-        aviso('Pedido de ajuste enviado para a equipe Vie.');
-      };
+    ligarAprovacaoMes(el, { ctx, mes, aoMudar: atualizar });
+    el.querySelector('[data-reler-html]')?.addEventListener('click', async () => {
+      if (posts.length && !(await confirmar('Os conteúdos deste mês serão substituídos pelos que estão no HTML. O que já foi marcado como aprovado, gravado ou postado continua marcado.', { botao: 'Ler de novo' }))) return;
+      const novo = await lerPostsDoHtml(ctx, mes);
+      if (novo) atualizar(novo);
     });
     el.querySelector('[data-comentar-mes]')?.addEventListener('click', async () => {
       const texto = el.querySelector('[data-comentario-mes]').value.trim();
@@ -198,6 +188,9 @@ export async function render(el, ctx) {
         m.fechar();
         aviso(doc.status === 'publicado' ? 'Cronograma atualizado. O cliente já vê a nova versão.' : 'Cronograma enviado. Confira e clique em “Liberar para o cliente”.');
         desenhar();
+        // Em seguida, lê os posts do HTML para atualizar a visão geral e o acompanhamento.
+        const lido = await lerPostsDoHtml(ctx, mes);
+        if (lido) atualizar(lido);
       } catch (err) {
         falhou(err);
         ev.target.disabled = false;
@@ -207,16 +200,14 @@ export async function render(el, ctx) {
 
   function interativo() {
     const src = `/api/cronograma?cliente=${id}&mes=${mes}&interativo=1&v=${encodeURIComponent(doc.interativo.enviadoEm)}`;
-    const ap = doc.aprovacaoMes;
-    const estado = ap?.status === 'aprovado' ? ['Aprovado', 'var(--s-aprovado)'] : ap?.status === 'ajuste' ? ['Ajuste pedido', 'var(--s-ajuste)'] : ['Esperando aprovação', 'var(--s-aprovacao)'];
     const conversa = doc.conversa || [];
+    const l = doc.leituraHtml;
     return `
       <div class="cartao" style="margin-bottom:16px;display:grid;gap:14px">
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-          <span class="etq" style="--cor:${estado[1]}"><span class="ponto"></span>${estado[0]}</span>
-          <span class="muted" style="font-size:13px">${ap ? `por ${esc(ap.nome)} em ${esc(quando(ap.em))}` : `versão enviada em ${esc(quando(doc.interativo.enviadoEm))}`}</span>
+          <span class="muted" style="font-size:13px">Versão enviada em ${esc(quando(doc.interativo.enviadoEm))}${admin && l ? ` · ${l.total} ${l.total === 1 ? 'conteúdo lido' : 'conteúdos lidos'} para o acompanhamento${l.observacao ? ` (${esc(l.observacao)})` : ''}` : ''}${admin && !l ? ' · os posts ainda não foram lidos para o acompanhamento' : ''}</span>
           <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
-            ${!admin && ap?.status !== 'aprovado' ? '<button class="btn acc peq" data-aprovar-mes>Aprovar cronograma</button><button class="btn claro peq" data-ajuste-mes>Pedir ajuste</button>' : ''}
+            ${admin ? `<button class="btn ${l ? 'claro' : 'acc'} peq" data-reler-html>${l ? 'Ler os posts de novo' : 'Ler os posts do HTML'}</button>` : ''}
             <a class="btn claro peq" href="${src}" target="_blank" rel="noopener">${icones.link}Abrir em tela cheia</a>
             ${admin ? `<button class="btn-icone" data-remover-html title="Remover arquivo">${icones.lixo}</button>` : ''}
           </span>

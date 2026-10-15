@@ -2,6 +2,11 @@
   "framework": null,
   "outputDirectory": "public",
   "functions": {
-    "api/documentos.js": { "maxDuration": 60 }
+    "api/documentos.js": {
+      "maxDuration": 60
+    },
+    "api/cronograma.js": {
+      "maxDuration": 300
+    }
   }
 }

@@ -2,6 +2,7 @@ import {
   handler, metodo, exigirAdmin, exigirAcessoCliente, HttpError, getRedis, keys, texto, mesValido, novoId, lerCorpoBruto,
 } from '../lib/base.js';
 import { salvarArquivo, lerArquivo, apagarArquivo } from '../lib/arquivos.js';
+import { lerPostsDoHtml } from '../lib/ia.js';
 import { FORMATOS, STATUS, STATUS_DO_CLIENTE, gerarEsqueleto } from '../public/js/regras.js';
 
 // Cronograma mensal: cada mês é um documento com os conteúdos (feed e stories).
@@ -102,6 +103,52 @@ export default handler(async (req, res, usuario) => {
       break;
     }
 
+    // Lê os conteúdos de dentro do cronograma em HTML para alimentar a visão geral,
+    // o calendário e o acompanhamento (gravado/postado) de cada post.
+    case 'ler-html': {
+      exigirAdmin(usuario);
+      if (!doc.interativo) throw new HttpError(400, 'Suba o cronograma em HTML antes.');
+      const [arquivo, editorial] = await Promise.all([lerArquivo(doc.interativo.arquivoId), redis.get(keys.editorial(clienteId))]);
+      const pilares = editorial?.pilares || [];
+      const lido = await lerPostsDoHtml({ html: arquivo.conteudo.toString('utf8'), mes, pilares });
+      const normal = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+      const pilarPorNome = new Map(pilares.map((p) => [normal(p.nome), p.id]));
+      const anteriores = new Map(doc.posts.map((p) => [`${p.data}|${p.formato}`, p]));
+      const aprovado = doc.aprovacaoMes?.status === 'aprovado';
+      const doMes = lido.posts.filter((p) => /^\d{4}-\d{2}-\d{2}$/.test(p.data) && p.data.startsWith(`${mes}-`));
+      doc.posts = doMes.map((p) => {
+        const formato = FORMATOS[p.formato] ? p.formato : 'reel';
+        const antes = anteriores.get(`${p.data}|${formato}`);
+        // O andamento já marcado (aprovado, gravado, postado) continua valendo na versão nova.
+        const manter = antes && ['aprovado', 'gravado', 'postado'].includes(antes.status);
+        return {
+          id: antes?.id || novoId('p'),
+          data: p.data,
+          horario: texto(p.horario, 40),
+          formato,
+          pilarId: pilarPorNome.get(normal(p.pilar)) || null,
+          titulo: texto(p.titulo, 300),
+          gancho: texto(p.gancho, 2000),
+          roteiro: texto(p.roteiro, 10000),
+          legenda: texto(p.legenda, 5000),
+          referencias: antes?.referencias || [],
+          notaInterna: antes?.notaInterna || '',
+          status: manter ? antes.status : (aprovado ? 'aprovado' : 'pauta'),
+          statusPor: manter ? antes.statusPor : undefined,
+          comentarios: antes?.comentarios || [],
+          ideiaId: null,
+          origem: 'html',
+        };
+      });
+      doc.leituraHtml = {
+        em: assinatura.em,
+        total: doc.posts.length,
+        foraDoMes: lido.posts.length - doMes.length,
+        observacao: texto(lido.observacao, 500),
+      };
+      break;
+    }
+
     case 'remover-interativo':
       exigirAdmin(usuario);
       if (doc.interativo) await apagarArquivo(doc.interativo.arquivoId);
@@ -116,6 +163,12 @@ export default handler(async (req, res, usuario) => {
       const comentario = String(corpo.comentario || '').trim();
       if (corpo.acao === 'ajuste-mes' && !comentario) throw new HttpError(400, 'Conte o que você gostaria de ajustar.');
       doc.aprovacaoMes = { status: corpo.acao === 'aprovar-mes' ? 'aprovado' : 'ajuste', ...assinatura };
+      // Aprovar o cronograma aprova junto os conteúdos que ainda estavam esperando.
+      if (corpo.acao === 'aprovar-mes') {
+        doc.posts.forEach((p) => {
+          if (['pauta', 'aprovacao'].includes(p.status)) { p.status = 'aprovado'; p.statusPor = assinatura; }
+        });
+      }
       if (comentario) doc.conversa = [...(doc.conversa || []), { id: novoId('c'), texto: texto(comentario, 2000), ...assinatura }];
       break;
     }

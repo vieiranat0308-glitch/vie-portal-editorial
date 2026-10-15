@@ -3,6 +3,7 @@ import { api, esc, falhou, hojeISO, mesAtual, somarMes, saudacao, diaSemanaCurto
 import { FORMATOS, STATUS, nomeDoMes, corDoPilar } from '../regras.js';
 import { linhaSuave, miniCalendario } from '../componentes/graficos.js';
 import { abrirPost, etiquetaFormato, etiquetaStatus } from '../componentes/post.js';
+import { faixaAprovacaoMes, ligarAprovacaoMes } from '../componentes/aprovacao-mes.js';
 
 export async function render(el, ctx) {
   const { cliente, admin } = ctx;
@@ -38,7 +39,7 @@ export async function render(el, ctx) {
     const frases = [];
     if (mes === mesAtual()) frases.push(deHoje.length ? `Hoje ${deHoje.length === 1 ? 'tem 1 conteúdo' : `tem ${deHoje.length} conteúdos`} no cronograma` : 'Hoje não tem conteúdo de feed no cronograma');
     if (admin && ajustes) frases.push(`${ajustes} ${ajustes === 1 ? 'ajuste pedido' : 'ajustes pedidos'} pelo cliente`);
-    if (!admin && paraAprovar) frases.push(`${paraAprovar} ${paraAprovar === 1 ? 'conteúdo esperando' : 'conteúdos esperando'} a sua aprovação`);
+    if (!admin && paraAprovar && !doc.interativo) frases.push(`${paraAprovar} ${paraAprovar === 1 ? 'conteúdo esperando' : 'conteúdos esperando'} a sua aprovação`);
     const apMes = doc.interativo ? doc.aprovacaoMes?.status || 'aguardando' : null;
     if (!admin && apMes === 'aguardando') frases.push(`o cronograma de ${nomeDoMes(mes).split(' ')[0].toLowerCase()} está esperando a sua aprovação`);
     if (admin && doc.status === 'publicado' && apMes === 'ajuste') frases.push('o cliente pediu ajuste no cronograma do mês');
@@ -61,7 +62,8 @@ export async function render(el, ctx) {
         <p>${frases.length ? `${esc(frases.join(' e ').replace(/^./, (c) => c.toUpperCase()))}.` : ''} ${editorial.objetivo?.titulo ? `Foco da estratégia: ${esc(editorial.objetivo.titulo.charAt(0).toLowerCase() + editorial.objetivo.titulo.slice(1))}.` : ''}</p>
       </section>
 
-      <div class="painel-grade">
+      <div style="margin-top:20px">${faixaAprovacaoMes({ ctx, doc, mes })}</div>
+      <div class="painel-grade" style="margin-top:4px">
         <div class="coluna">
           <div class="duas">
             <div class="cartao destaque">
@@ -144,6 +146,7 @@ export async function render(el, ctx) {
         </div>
       </div>`;
 
+    ligarAprovacaoMes(el, { ctx, mes, aoMudar: (d) => { doc = d; desenhar(); } });
     miniCalendario(el.querySelector('[data-cal]'), {
       mes,
       posts,
