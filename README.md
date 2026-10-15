@@ -62,7 +62,7 @@ O mesmo modelo dos outros projetos: Vercel com HTML/JS puro (sem build), funçõ
 
 1. **Importar**: Vercel → *Add New → Project* → este repositório. Não precisa mudar nada no build.
 2. **Banco de dados**: no projeto, *Storage → Create → Upstash Redis* (o plano gratuito serve) e conecte ao projeto.
-3. **Arquivos**: *Storage → Create → Blob* e conecte ao projeto. Isso cria a variável `BLOB_READ_WRITE_TOKEN` sozinho.
+3. **Arquivos**: *Storage → Create → Blob* e conecte ao projeto. A Vercel cria sozinha a variável `BLOB_STORE_ID` (ou `BLOB_READ_WRITE_TOKEN`, nas conexões antigas); o portal aceita as duas e guarda os arquivos como privados sempre que o armazenamento permite.
 4. **Variáveis de ambiente** (*Settings → Environment Variables*):
    - `ADMIN_EMAIL`: o seu e-mail de login (conta principal da Vie).
    - `ADMIN_PASSWORD`: a sua senha (use uma senha forte).
