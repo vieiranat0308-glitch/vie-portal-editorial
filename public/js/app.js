@@ -10,6 +10,7 @@ const PAGINAS = {
   cronograma: () => import('./paginas/cronograma.js'),
   aprovacao: () => import('./paginas/aprovacao.js'),
   ideias: () => import('./paginas/ideias.js'),
+  evolucao: () => import('./paginas/evolucao.js'),
   metricas: () => import('./paginas/metricas.js'),
   documentos: () => import('./paginas/documentos.js'),
   acessos: () => import('./paginas/acessos.js'),
@@ -26,6 +27,7 @@ const MENU_CLIENTE = [
     ['ideias', 'Banco de ideias', 'ideia'],
   ] },
   { grupo: 'Acompanhamento', itens: [
+    ['evolucao', 'Evolução do perfil', 'perfil'],
     ['metricas', 'Métricas', 'metricas'],
     ['documentos', 'Documentos', 'documentos'],
   ] },

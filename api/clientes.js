@@ -1,7 +1,7 @@
 import {
   handler, metodo, exigirAdmin, exigirAcessoCliente, HttpError, getRedis, keys, slugify, texto, novoId,
 } from '../lib/base.js';
-import { exemploCliente, exemploEditorial, exemploIdeias, exemploMetricas } from '../lib/exemplo.js';
+import { exemploCliente, exemploEditorial, exemploIdeias, exemploMetricas, exemploEvolucao } from '../lib/exemplo.js';
 
 export default handler(async (req, res, usuario) => {
   metodo(req, 'GET', 'POST', 'PUT', 'DELETE');
@@ -32,6 +32,7 @@ export default handler(async (req, res, usuario) => {
       await redis.set(keys.editorial(novo), exemploEditorial);
       await redis.set(keys.ideias(novo), exemploIdeias.map((i) => ({ ...i, id: novoId('i'), roteiro: i.roteiro || '', referencias: [], origem: 'vie', criadoEm: cliente.criadoEm })));
       await redis.set(keys.metricas(novo), exemploMetricas);
+      await redis.set(keys.evolucao(novo), exemploEvolucao.map((r) => ({ ...r, id: novoId('r'), criadoEm: cliente.criadoEm })));
     }
     return res.status(200).json(cliente);
   }
@@ -50,12 +51,14 @@ export default handler(async (req, res, usuario) => {
   const usuarios = Object.values((await redis.hgetall(keys.usuarios)) || {}).filter((u) => u.clienteId === id);
   const { apagarArquivo } = await import('../lib/arquivos.js');
   await Promise.all(docs.filter((d) => d.arquivoId).map((d) => apagarArquivo(d.arquivoId)));
+  const evolucao = (await redis.get(keys.evolucao(id))) || [];
+  await Promise.all(evolucao.flatMap((r) => r.prints || []).map(apagarArquivo));
   const editorial = await redis.get(keys.editorial(id));
   if (editorial?.pdf) await apagarArquivo(editorial.pdf.arquivoId);
   const crons = await Promise.all(meses.map((m) => redis.get(keys.cronograma(id, m))));
   await Promise.all(crons.filter((c) => c?.interativo).map((c) => apagarArquivo(c.interativo.arquivoId)));
   await redis.del(
-    keys.editorial(id), keys.ideias(id), keys.metricas(id), keys.documentos(id), keys.meses(id),
+    keys.editorial(id), keys.ideias(id), keys.metricas(id), keys.documentos(id), keys.meses(id), keys.evolucao(id),
     ...meses.map((m) => keys.cronograma(id, m)),
   );
   if (usuarios.length) await redis.hdel(keys.usuarios, ...usuarios.map((u) => u.email));

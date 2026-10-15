@@ -511,3 +511,31 @@ textarea.entrada { resize: vertical; min-height: 84px; line-height: 1.5; }
 .folha-pdf canvas { display: block; width: 100%; height: auto; }
 .faixa-aprovacao { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--cor); border-radius: 16px; padding: 16px 18px; margin-bottom: 18px; }
 .faixa-aprovacao b { font-weight: 600; }
+
+/* ---------- Evolução do perfil ---------- */
+.antes-agora { align-items: start; }
+.perfil-ig { display: grid; gap: 14px; align-content: start; }
+.print-perfil { width: 100%; max-height: 360px; object-fit: cover; object-position: top; border-radius: 14px; border: 1px solid var(--line); cursor: zoom-in; background: #fff; }
+.cab-ig-mini { display: flex; gap: 14px; align-items: center; }
+.cab-ig-mini .avatar { width: 54px; height: 54px; font-size: 18px; }
+.numeros-ig { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 4px; }
+.numeros-ig > div { display: grid; line-height: 1.2; }
+.numeros-ig b { font: 600 18px var(--sans); }
+.numeros-ig span { font-size: 12.5px; color: var(--muted); }
+.numeros-ig em { font-style: normal; font-size: 12px; font-weight: 600; }
+.numeros-ig em.sobe { color: var(--s-aprovado); }
+.numeros-ig em.desce { color: var(--s-ajuste); }
+.bio-ig { white-space: pre-wrap; font-size: 14px; margin-top: 4px; }
+.destaques-ig { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.destaques-ig span { padding: 4px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-size: 12.5px; }
+.registro-evolucao .registro-corpo { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; }
+.prints-mini { display: flex; gap: 8px; }
+.prints-mini img { width: 96px; height: 120px; object-fit: cover; object-position: top; border-radius: 10px; border: 1px solid var(--line); cursor: zoom-in; }
+.analise-vie { background: var(--surface); border-left: 3px solid var(--acc); border-radius: 0 12px 12px 0; padding: 12px 14px; }
+.analise-vie .mono { color: var(--acc); font-size: 9.5px; }
+.analise-vie p { white-space: pre-wrap; margin-top: 4px; font-size: 14.5px; }
+.prints-form { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 8px; }
+.print-form { position: relative; }
+.print-form img { width: 90px; height: 112px; object-fit: cover; object-position: top; border-radius: 10px; border: 1px solid var(--line); display: block; }
+.print-form .btn-icone { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; }
+@media (max-width: 640px) { .registro-evolucao .registro-corpo { grid-template-columns: 1fr; } }
