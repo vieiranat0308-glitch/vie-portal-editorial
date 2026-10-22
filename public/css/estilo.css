@@ -550,3 +550,6 @@ textarea.entrada { resize: vertical; min-height: 84px; line-height: 1.5; }
 .cartao-cliente { align-content: start; }
 .cartao-cliente .alertas { align-items: center; align-content: flex-start; min-height: 0; }
 .cartao-cliente .alertas:empty { display: none; }
+.linha-servico { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.linha-servico .abas-servico { grid-column: 2 / -1; }
+.abas-servico label { font-size: 12.5px; padding: 4px 9px; }

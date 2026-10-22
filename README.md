@@ -2,9 +2,18 @@
 
 Portal da **consultoria editorial** da Vie Company. A equipe Vie acompanha todos os clientes num só lugar, e cada cliente tem um **acesso exclusivo** para ver o que foi entregue a ele.
 
-## Serviços e etiquetas
+## Serviços, etiquetas e abas
 
-O portal reúne **todos os clientes da Vie**. Cada cliente recebe as etiquetas dos serviços que a Vie presta para ele (Consultoria editorial, Gestão de redes sociais, Tráfego pago, Produção de conteúdo, Branding, Site…). Na visão geral, dá para filtrar os clientes por serviço e ver quantos clientes há em cada um. A lista de serviços (nome e cor) é editada em **Serviços**, no menu da Vie. Os clientes cadastrados antes das etiquetas aparecem como Consultoria editorial.
+O portal reúne **todos os clientes da Vie**. Cada cliente recebe as etiquetas dos serviços que a Vie presta para ele, e **cada serviço define as abas que o cliente vê**. Visão geral e Documentos aparecem sempre; quem tem mais de um serviço vê a soma das abas. Padrão:
+
+| Serviço | Abas |
+|---|---|
+| Gestão de Instagram | Linha editorial, Cronograma, Aprovação, Banco de ideias, Evolução do perfil, Métricas |
+| Produção de vídeo | Cronograma, Aprovação, Banco de ideias |
+| Gestão de tráfego | Métricas, Evolução do perfil |
+| Consultoria editorial | Linha editorial, Cronograma, Aprovação, Banco de ideias, Evolução do perfil, Métricas |
+
+Nome, cor e abas de cada serviço são editados em **Serviços**, no menu da Vie. Cliente sem cronograma nos serviços (por exemplo, só tráfego) tem uma visão geral de resultados: números do mês, gráfico, leitura da Vie e documentos recentes. Na visão geral da Vie, os clientes podem ser filtrados por serviço. Clientes cadastrados antes das etiquetas aparecem como Consultoria editorial.
 
 ## O que tem no portal
 

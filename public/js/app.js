@@ -220,7 +220,10 @@ async function telaCliente(rota) {
   document.title = `${cliente.nome} · Portal Assessoria de Marketing`;
 
   const base = `#/c/${encodeURIComponent(cliente.id)}`;
-  const menuHtml = MENU_CLIENTE.filter((g) => admin || !g.soAdmin).map((g) => `
+  const abas = abasDoCliente(cliente);
+  // Aba fora dos serviços do cliente volta para a visão geral.
+  if (!abas.has(rota.pagina)) return ir(`/c/${encodeURIComponent(cliente.id)}`);
+  const menuHtml = MENU_CLIENTE.filter((g) => admin || !g.soAdmin).map((g) => ({ ...g, itens: g.itens.filter(([id]) => abas.has(id)) })).filter((g) => g.itens.length).map((g) => `
     <div class="grupo"><span class="mono">${g.grupo}</span>
       ${g.itens.map(([id, nome, icone]) => `
         <a class="nav-item${rota.pagina === id ? ' ativo' : ''}" href="${base}${id === 'painel' ? '' : `/${id}`}">
@@ -235,8 +238,18 @@ async function telaCliente(rota) {
 
   const conteudo = moldura({ marcaHtml, menuHtml, titulo: cliente.nome });
   const ctx = criarContexto({ cliente, admin, rota, conteudo });
+  ctx.abas = abas;
   await carregarPagina(rota.pagina, conteudo, ctx);
   atualizarContadorAprovacao(ctx);
+}
+
+// Abas que o cliente vê: as dos serviços que ele contrata (Visão geral, Documentos
+// e, para a Vie, Acessos e Configurações aparecem sempre).
+const TODAS_AS_ABAS = ['linha', 'cronograma', 'aprovacao', 'ideias', 'evolucao', 'metricas'];
+function abasDoCliente(cliente) {
+  const servicos = (estado.servicos || []).filter((s) => (cliente.servicos || []).includes(s.id));
+  const liberadas = servicos.length ? servicos.flatMap((s) => s.abas || TODAS_AS_ABAS) : TODAS_AS_ABAS;
+  return new Set(['painel', 'documentos', 'acessos', 'config', ...liberadas]);
 }
 
 async function telaVie(rota) {

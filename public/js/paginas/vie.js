@@ -7,6 +7,12 @@ import { etiquetasServicos } from '../componentes/servicos.js';
 
 let filtroServico = '';
 
+const NOMES_ABAS = {
+  linha: 'Linha editorial', cronograma: 'Cronograma', aprovacao: 'Aprovação', ideias: 'Banco de ideias', evolucao: 'Evolução do perfil', metricas: 'Métricas',
+};
+// O cliente tem algum serviço que inclui a aba?
+const temAba = (c, aba, servicos) => servicos.some((s) => (c.servicos || []).includes(s.id) && (s.abas || []).includes(aba));
+
 export async function render(el, ctx) {
   if (ctx.rota.pagina === 'equipe') {
     ctx.topo('Geral', 'Equipe Vie');
@@ -34,7 +40,7 @@ export async function render(el, ctx) {
     desenhar();
   }
 
-  const temEditorial = (c) => (c.servicos || []).includes('editorial');
+  const temEditorial = (c) => temAba(c, 'cronograma', ctx.servicos());
 
   function desenhar() {
     const servicos = ctx.servicos();
@@ -51,7 +57,7 @@ export async function render(el, ctx) {
       <section class="saudacao">
         <h1>${saudacao()}, ${esc(ctx.usuario.nome.split(' ')[0])}</h1>
         <p>${clientes.length
-          ? `Assessoria de marketing em ${esc(nomeDoMes(mes).toLowerCase())}: ${clientes.length} ${clientes.length === 1 ? 'cliente' : 'clientes'}${semCronograma ? `, ${semCronograma} da consultoria editorial ainda sem cronograma` : ''}${rascunhos ? `, ${rascunhos} com cronograma em rascunho` : ''}.`
+          ? `Assessoria de marketing em ${esc(nomeDoMes(mes).toLowerCase())}: ${clientes.length} ${clientes.length === 1 ? 'cliente' : 'clientes'}${semCronograma ? `, ${semCronograma} ainda sem cronograma` : ''}${rascunhos ? `, ${rascunhos} com cronograma em rascunho` : ''}.`
           : 'Comece cadastrando o primeiro cliente da Vie.'}</p>
       </section>
 
@@ -123,7 +129,7 @@ function novoCliente(ctx) {
       m.fechar();
       ctx.limparClientes();
       aviso('Cliente cadastrado.');
-      ctx.ir(`/c/${encodeURIComponent(c.id)}${(c.servicos || []).includes('editorial') ? '/linha' : ''}`);
+      ctx.ir(`/c/${encodeURIComponent(c.id)}${temAba(c, 'linha', ctx.servicos()) ? '/linha' : ''}`);
     } catch (err) { falhou(err); }
   };
   m.el.querySelector('[data-ok]').onclick = () => criar(lerCliente(m.el.querySelector('[data-form]')));
@@ -139,7 +145,7 @@ async function paginaServicos(el, ctx) {
 
   function desenhar() {
     el.innerHTML = `
-      <section class="saudacao"><h1>Serviços</h1><p>Os serviços que a Vie presta viram etiquetas nos clientes. Use-as para filtrar a visão geral e ver quem tem cada serviço.</p></section>
+      <section class="saudacao"><h1>Serviços</h1><p>Os serviços que a Vie presta viram etiquetas nos clientes e definem as abas que cada cliente vê no portal. Visão geral e Documentos aparecem sempre; quem tem mais de um serviço vê a soma das abas.</p></section>
       <div class="cartao" style="margin-top:22px;max-width:760px;display:grid;gap:10px">
         ${lista.map((s, i) => `
           <div class="linha-servico">
@@ -147,11 +153,20 @@ async function paginaServicos(el, ctx) {
             <input class="entrada" value="${esc(s.nome)}" data-nome="${i}" placeholder="Nome do serviço">
             <span class="muted" style="font-size:13px;white-space:nowrap">${s.id && uso(s.id) ? `${uso(s.id)} ${uso(s.id) === 1 ? 'cliente' : 'clientes'}` : ''}</span>
             <button class="btn-icone" data-remover="${i}" title="Remover">${icones.lixo}</button>
+            <div class="opcoes-check abas-servico">${Object.entries(NOMES_ABAS).map(([aba, nome]) => `<label><input type="checkbox" data-aba="${i}|${aba}"${(s.abas || []).includes(aba) ? ' checked' : ''}> ${nome}</label>`).join('')}</div>
           </div>`).join('')}
         <div><button class="btn claro peq" data-adicionar>${icones.mais}Adicionar serviço</button></div>
       </div>`;
     el.querySelectorAll('[data-nome]').forEach((c) => { c.oninput = () => { lista[c.dataset.nome].nome = c.value; }; });
     el.querySelectorAll('[data-cor]').forEach((c) => { c.oninput = () => { lista[c.dataset.cor].cor = c.value; }; });
+    el.querySelectorAll('[data-aba]').forEach((c) => {
+      c.onchange = () => {
+        const [i, aba] = c.dataset.aba.split('|');
+        const atual = new Set(lista[i].abas || []);
+        if (c.checked) atual.add(aba); else atual.delete(aba);
+        lista[i].abas = Object.keys(NOMES_ABAS).filter((a) => atual.has(a));
+      };
+    });
     el.querySelectorAll('[data-remover]').forEach((b) => {
       b.onclick = async () => {
         const s = lista[b.dataset.remover];
@@ -160,7 +175,7 @@ async function paginaServicos(el, ctx) {
         desenhar();
       };
     });
-    el.querySelector('[data-adicionar]').onclick = () => { lista.push({ nome: '', cor: '#8a391b' }); desenhar(); el.querySelectorAll('[data-nome]')[lista.length - 1]?.focus(); };
+    el.querySelector('[data-adicionar]').onclick = () => { lista.push({ nome: '', cor: '#8a391b', abas: ['metricas'] }); desenhar(); el.querySelectorAll('[data-nome]')[lista.length - 1]?.focus(); };
   }
 
   acoes.querySelector('[data-salvar]').onclick = async () => {

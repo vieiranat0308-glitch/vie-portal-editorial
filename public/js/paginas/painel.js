@@ -6,6 +6,8 @@ import { abrirPost, etiquetaFormato, etiquetaStatus } from '../componentes/post.
 import { faixaAprovacaoMes, ligarAprovacaoMes } from '../componentes/aprovacao-mes.js';
 
 export async function render(el, ctx) {
+  // Cliente sem cronograma nos serviços (ex.: só tráfego) vê uma visão geral de resultados.
+  if (ctx.abas && !ctx.abas.has('cronograma')) return visaoResultados(el, ctx);
   const { cliente, admin } = ctx;
   const id = encodeURIComponent(cliente.id);
   let mes = mesAtual();
@@ -200,3 +202,46 @@ export function storiesDoDia(editorial, iso) {
     </div>`;
 }
 
+
+// Visão geral para clientes sem cronograma: números do perfil e documentos recentes.
+async function visaoResultados(el, ctx) {
+  const { cliente, admin } = ctx;
+  const id = encodeURIComponent(cliente.id);
+  ctx.topo('Geral', 'Visão geral');
+  const [metricas, docs] = await Promise.all([
+    ctx.abas.has('metricas') ? api(`metricas?cliente=${id}`) : {},
+    api(`documentos?cliente=${id}`),
+  ]);
+  const meses = Object.keys(metricas).sort();
+  const m = meses.length ? metricas[meses.at(-1)] : null;
+  const a = meses.length > 1 ? metricas[meses.at(-2)] : null;
+  const nome = cliente.tratamento || (admin ? cliente.nome : ctx.usuario.nome).split(' ')[0];
+  const cartaoNumero = (rotulo, campo, formatar = num) => {
+    const v = m?.[campo];
+    const d = v != null && a?.[campo] != null ? v - a[campo] : null;
+    return `<div class="cartao"><div class="numero-grande">${v == null ? '—' : formatar(v)}</div><div class="rot">${rotulo}</div>${d ? `<span class="delta ${d > 0 ? 'sobe' : 'desce'}" style="margin-top:8px;display:inline-block">${d > 0 ? '+' : '−'}${num(Math.abs(d))} no mês</span>` : ''}</div>`;
+  };
+  el.innerHTML = `
+    <section class="saudacao">
+      <h1>${saudacao()}, ${esc(nome)}</h1>
+      <p>${m ? `Resultados de ${esc(nomeDoMes(meses.at(-1)).toLowerCase())}${a ? `, comparados com ${esc(nomeDoMes(meses.at(-2)).toLowerCase())}` : ''}.` : 'Os resultados aparecem aqui depois do primeiro acompanhamento mensal da equipe Vie.'}</p>
+    </section>
+    ${ctx.abas.has('metricas') ? `
+      <div class="resumo-vie">
+        ${cartaoNumero('Seguidores', 'seguidores')}
+        ${cartaoNumero('Visualizações', 'visualizacoes', compacto)}
+        ${cartaoNumero('Interações', 'interacoes', compacto)}
+        ${cartaoNumero('Visitas ao perfil', 'visitasPerfil')}
+        ${cartaoNumero('Novos pacientes', 'pacientes')}
+      </div>
+      ${meses.length > 1 ? `<div class="cartao" style="margin-top:18px"><div class="cab"><h3>Visualizações</h3><a class="btn claro peq" style="margin-left:auto" href="#${ctx.base}/metricas">Ver métricas</a></div><div style="color:var(--acc)">${linhaSuave(meses.map((k) => metricas[k].visualizacoes), { cor: 'currentColor', altura: 110, area: true })}</div></div>` : ''}
+      ${m?.observacoes ? `<div class="objetivo" style="margin-top:18px"><div><span class="mono">Leitura da Vie</span><p style="margin-top:4px;white-space:pre-wrap">${esc(m.observacoes)}</p></div></div>` : ''}` : ''}
+    <div class="cartao" style="margin-top:18px">
+      <div class="cab"><h3>Documentos recentes</h3><a class="btn claro peq" style="margin-left:auto" href="#${ctx.base}/documentos">Ver todos</a></div>
+      ${docs.length ? `<div style="display:grid;gap:8px">${docs.slice(0, 4).map((d) => `
+        <div class="doc-item" style="margin:0"><span class="icone-doc">${d.url ? 'LINK' : d.tipo === 'application/pdf' ? 'PDF' : 'IMG'}</span>
+          <div style="min-width:0"><div class="nome">${esc(d.nome)}</div><div class="info">${esc(new Date(d.criadoEm).toLocaleDateString('pt-BR'))}</div></div>
+          <div class="acoes"><a class="btn claro peq" target="_blank" rel="noopener" href="${d.url ? esc(d.url) : `/api/documentos?cliente=${id}&baixar=${encodeURIComponent(d.id)}&abrir=1`}">Abrir</a></div></div>`).join('')}</div>`
+        : '<p class="muted" style="font-size:14px">Nenhum documento ainda.</p>'}
+    </div>`;
+}

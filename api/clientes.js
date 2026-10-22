@@ -17,6 +17,7 @@ export default handler(async (req, res, usuario) => {
       id: /^[a-z0-9-]{2,40}$/.test(s.id || '') ? s.id : slugify(s.nome),
       nome: texto(s.nome, 60).trim(),
       cor: /^#[0-9a-f]{6}$/i.test(s.cor || '') ? s.cor : '#8a391b',
+      abas: (Array.isArray(s.abas) ? s.abas : []).filter((a) => ABAS.includes(a)),
     })).filter((s) => s.nome);
     if (!lista.length) throw new HttpError(400, 'Mantenha pelo menos um serviço.');
     if (new Set(lista.map((s) => s.id)).size !== lista.length) throw new HttpError(400, 'Há dois serviços com o mesmo nome.');
@@ -114,17 +115,22 @@ async function resumo(clienteId, mes) {
   };
 }
 
+// Abas do portal que cada serviço libera para o cliente (Visão geral e Documentos aparecem sempre).
+export const ABAS = ['linha', 'cronograma', 'aprovacao', 'ideias', 'evolucao', 'metricas'];
+const ABAS_CONTEUDO = ['linha', 'cronograma', 'aprovacao', 'ideias', 'evolucao', 'metricas'];
+
 export const SERVICOS_PADRAO = [
-  { id: 'editorial', nome: 'Consultoria editorial', cor: '#8a391b' },
-  { id: 'social', nome: 'Gestão de redes sociais', cor: '#3f6a8a' },
-  { id: 'trafego', nome: 'Tráfego pago', cor: '#4f7a52' },
-  { id: 'conteudo', nome: 'Produção de conteúdo', cor: '#b0813a' },
-  { id: 'branding', nome: 'Branding', cor: '#8a6a9a' },
-  { id: 'site', nome: 'Site', cor: '#5a5048' },
+  { id: 'instagram', nome: 'Gestão de Instagram', cor: '#3f6a8a', abas: ABAS_CONTEUDO },
+  { id: 'video', nome: 'Produção de vídeo', cor: '#b0813a', abas: ['cronograma', 'aprovacao', 'ideias'] },
+  { id: 'trafego', nome: 'Gestão de tráfego', cor: '#4f7a52', abas: ['metricas', 'evolucao'] },
+  { id: 'editorial', nome: 'Consultoria editorial', cor: '#8a391b', abas: ABAS_CONTEUDO },
 ];
 
 async function listarServicos() {
-  return (await getRedis().get(keys.servicos)) || SERVICOS_PADRAO;
+  const salvos = await getRedis().get(keys.servicos);
+  if (!salvos) return SERVICOS_PADRAO;
+  // Serviços salvos antes das abas por serviço: usa o padrão do mesmo serviço ou todas.
+  return salvos.map((s) => (Array.isArray(s.abas) ? s : { ...s, abas: SERVICOS_PADRAO.find((p) => p.id === s.id)?.abas || ABAS }));
 }
 
 // Clientes cadastrados antes das etiquetas eram todos da consultoria editorial.
