@@ -216,6 +216,8 @@ export default handler(async (req, res, usuario) => {
       if (!admin) {
         if (doc.status !== 'publicado') throw new HttpError(403, 'Este cronograma ainda não foi liberado.');
         if (!STATUS_DO_CLIENTE.includes(corpo.status)) throw new HttpError(403, 'Este status é definido pela equipe Vie.');
+        // No cronograma da Vie quem grava e publica é a equipe; o cliente só aprova ou pede ajuste.
+        if (post.trilha === 'vie' && ['gravado', 'postado'].includes(corpo.status)) throw new HttpError(403, 'Este conteúdo é publicado pela equipe Vie.');
         if (corpo.status === 'ajuste' && !String(corpo.comentario || '').trim()) {
           throw new HttpError(400, 'Conte o que você gostaria de ajustar.');
         }
