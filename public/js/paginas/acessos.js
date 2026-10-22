@@ -11,7 +11,7 @@ export async function painelDeAcessos(el, { alvo, nomeAlvo, usuario }) {
   let dados = await api(`usuarios?cliente=${encodeURIComponent(alvo)}`);
 
   const link = (token) => `${location.origin}/#/convite/${token}`;
-  const mensagem = (c) => `Oi${c.nome ? `, ${c.nome.split(' ')[0]}` : ''}! ${equipe ? 'Este é o seu acesso à área da equipe no portal da Vie Company.' : `Este é o seu acesso exclusivo ao portal da consultoria editorial da Vie Company (${nomeAlvo}). Lá ficam a sua linha editorial, os cronogramas e as aprovações.`} Crie a sua senha por aqui (o link vale 7 dias): ${link(c.token)}`;
+  const mensagem = (c) => `Oi${c.nome ? `, ${c.nome.split(' ')[0]}` : ''}! ${equipe ? 'Este é o seu acesso à área da equipe no portal da Vie Company.' : `Este é o seu acesso exclusivo ao Portal Assessoria de Marketing da Vie Company (${nomeAlvo}). Lá ficam as entregas, os cronogramas, as aprovações e o acompanhamento dos resultados.`} Crie a sua senha por aqui (o link vale 7 dias): ${link(c.token)}`;
 
   function desenhar() {
     el.innerHTML = `

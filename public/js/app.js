@@ -1,7 +1,8 @@
-// Portal Editorial Vie Company: inicialização, rotas e estrutura das telas.
+// Portal Assessoria de Marketing · Vie Company: inicialização, rotas e estrutura das telas.
 import { api, esc, aviso, falhou, abrirCamada, lerCampos, icones, iniciais } from './ui.js';
+import { etiquetasServicos } from './componentes/servicos.js';
 
-const estado = { usuario: null, clienteProprio: null, clientes: null, cache: {} };
+const estado = { usuario: null, clienteProprio: null, clientes: null, servicos: null, cache: {} };
 const app = document.getElementById('app');
 
 const PAGINAS = {
@@ -45,6 +46,7 @@ function lerRota() {
   if (partes[0] === 'convite') return { tela: 'convite', token: partes[1] };
   if (partes[0] === 'c' && partes[1]) return { tela: 'cliente', clienteId: partes[1], pagina: PAGINAS[partes[2]] ? partes[2] : 'painel', extra: partes[3] };
   if (partes[0] === 'equipe') return { tela: 'vie', pagina: 'equipe' };
+  if (partes[0] === 'servicos') return { tela: 'vie', pagina: 'servicos' };
   return { tela: 'vie', pagina: 'inicio' };
 }
 
@@ -66,6 +68,7 @@ async function desenhar() {
     }
   }
   if (rota.tela === 'login') return ir('/');
+  if (!estado.servicos) estado.servicos = await api('clientes?servicos=1').catch(() => []);
   const admin = estado.usuario.role === 'admin';
 
   if (!admin) {
@@ -86,9 +89,9 @@ function telaLogin(mensagem = '') {
       <div class="arte">
         <img class="logo-img" src="/img/logo-creme.png" alt="Vie Company">
         <div>
-          <p class="mono" style="color:var(--creme-2)">Consultoria editorial</p>
+          <p class="mono" style="color:var(--creme-2)">Portal Assessoria de Marketing</p>
           <div class="linha"></div>
-          <h1>Sua estratégia de conteúdo, mês a mês, em um só lugar.</h1>
+          <h1>O marketing do seu consultório, mês a mês, em um só lugar.</h1>
         </div>
         <p class="mono" style="color:var(--creme-2);font-size:10px">Marketing para a área da saúde</p>
       </div>
@@ -175,7 +178,7 @@ function moldura({ marcaHtml, menuHtml, titulo }) {
         <div class="rodape">
           <div class="usuario"><span class="avatar">${esc(iniciais(u.nome))}</span><div><div class="nome">${esc(u.nome)}</div><div class="sub">${u.role === 'admin' ? 'Equipe Vie' : 'Cliente'}</div></div></div>
           <div class="acoes"><button data-conta>Minha conta</button><button data-sair>Sair</button></div>
-          ${u.role === 'admin' ? '' : '<div class="assinatura"><img src="/img/logo-creme.png" alt="Vie Company"><span>Consultoria editorial</span></div>'}
+          ${u.role === 'admin' ? '' : '<div class="assinatura"><img src="/img/logo-creme.png" alt="Vie Company"><span>Assessoria de marketing</span></div>'}
         </div>
       </div></aside>
       <div>
@@ -214,7 +217,7 @@ async function telaCliente(rota) {
   }
   if (estado.cache.cliente?.id !== cliente.id) estado.cache = { cliente };
   document.documentElement.style.setProperty('--acc', cliente.cor || '#8a391b');
-  document.title = `${cliente.nome} · Portal Editorial`;
+  document.title = `${cliente.nome} · Portal Assessoria de Marketing`;
 
   const base = `#/c/${encodeURIComponent(cliente.id)}`;
   const menuHtml = MENU_CLIENTE.filter((g) => admin || !g.soAdmin).map((g) => `
@@ -227,7 +230,8 @@ async function telaCliente(rota) {
   const marcaHtml = `
     ${admin ? `<a class="voltar" href="#/">${icones.voltar}Todos os clientes</a>` : ''}
     <div class="cliente-nome">${esc(cliente.nome)}</div>
-    <span class="mono">Consultoria editorial${cliente.instagram ? ` · @${esc(cliente.instagram)}` : ''}</span>`;
+    ${cliente.instagram ? `<span class="mono">@${esc(cliente.instagram)}</span>` : ''}
+    <div class="servicos-lateral">${etiquetasServicos(cliente.servicos, estado.servicos || [], { mini: true })}</div>`;
 
   const conteudo = moldura({ marcaHtml, menuHtml, titulo: cliente.nome });
   const ctx = criarContexto({ cliente, admin, rota, conteudo });
@@ -237,17 +241,18 @@ async function telaCliente(rota) {
 
 async function telaVie(rota) {
   document.documentElement.style.setProperty('--acc', '#8a391b');
-  document.title = 'Vie Company · Portal Editorial';
+  document.title = 'Vie Company · Portal Assessoria de Marketing';
   if (!estado.clientes) estado.clientes = await api('clientes').catch(() => []);
   const menuHtml = `
     <div class="grupo"><span class="mono">Geral</span>
       <a class="nav-item${rota.pagina === 'inicio' ? ' ativo' : ''}" href="#/">${icones.geral}<span>Visão geral</span></a>
+      <a class="nav-item${rota.pagina === 'servicos' ? ' ativo' : ''}" href="#/servicos">${icones.ajustes}<span>Serviços</span></a>
       <a class="nav-item${rota.pagina === 'equipe' ? ' ativo' : ''}" href="#/equipe">${icones.pessoas}<span>Equipe Vie</span></a>
     </div>
     <div class="grupo"><span class="mono">Clientes</span>
       ${estado.clientes.map((c) => `<a class="nav-item" href="#/c/${encodeURIComponent(c.id)}"><span class="bolinha" style="--cor:${esc(c.cor)}"></span><span>${esc(c.nome)}</span></a>`).join('') || '<span class="nav-item" style="opacity:.6">Nenhum cliente ainda</span>'}
     </div>`;
-  const marcaHtml = '<img class="logo-img" src="/img/logo-creme.png" alt="Vie Company"><span class="mono">Portal editorial</span>';
+  const marcaHtml = '<img class="logo-img" src="/img/logo-creme.png" alt="Vie Company"><span class="mono">Portal Assessoria<br>de Marketing</span>';
   const conteudo = moldura({ marcaHtml, menuHtml, titulo: 'Vie Company' });
   const ctx = criarContexto({ cliente: null, admin: true, rota, conteudo });
   await carregarPagina('vie', conteudo, ctx);
@@ -276,6 +281,8 @@ function criarContexto({ cliente, admin, rota, conteudo }) {
     definirIdeias(i) { estado.cache.ideias = i; },
     atualizarCliente(c) { estado.cache.cliente = c; if (!admin) estado.clienteProprio = c; estado.clientes = null; },
     limparClientes() { estado.clientes = null; },
+    servicos: () => estado.servicos || [],
+    definirServicos(lista) { estado.servicos = lista; },
     atualizarContadores: () => atualizarContadorAprovacao({ cliente, admin }),
   };
 }

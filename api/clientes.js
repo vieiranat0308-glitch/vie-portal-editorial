@@ -8,12 +8,28 @@ export default handler(async (req, res, usuario) => {
   const redis = getRedis();
   const id = String(req.query.id || '');
 
+  // Serviços prestados pela Vie (as etiquetas dos clientes). Todos leem; só a Vie edita.
+  if (req.query.servicos) {
+    if (req.method === 'GET') return res.status(200).json(await listarServicos());
+    exigirAdmin(usuario);
+    metodo(req, 'PUT');
+    const lista = (Array.isArray(req.body) ? req.body : []).slice(0, 30).map((s) => ({
+      id: /^[a-z0-9-]{2,40}$/.test(s.id || '') ? s.id : slugify(s.nome),
+      nome: texto(s.nome, 60).trim(),
+      cor: /^#[0-9a-f]{6}$/i.test(s.cor || '') ? s.cor : '#8a391b',
+    })).filter((s) => s.nome);
+    if (!lista.length) throw new HttpError(400, 'Mantenha pelo menos um serviço.');
+    if (new Set(lista.map((s) => s.id)).size !== lista.length) throw new HttpError(400, 'Há dois serviços com o mesmo nome.');
+    await redis.set(keys.servicos, lista);
+    return res.status(200).json(lista);
+  }
+
   if (req.method === 'GET') {
-    if (id) return res.status(200).json(await exigirAcessoCliente(usuario, id));
+    if (id) return res.status(200).json(comServicos(await exigirAcessoCliente(usuario, id)));
     exigirAdmin(usuario);
     const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : new Date().toISOString().slice(0, 7);
     const clientes = Object.values((await redis.hgetall(keys.clientes)) || {});
-    const lista = await Promise.all(clientes.map(async (c) => ({ ...c, resumo: await resumo(c.id, mes) })));
+    const lista = await Promise.all(clientes.map(async (c) => ({ ...comServicos(c), resumo: await resumo(c.id, mes) })));
     lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     return res.status(200).json(lista);
   }
@@ -34,7 +50,7 @@ export default handler(async (req, res, usuario) => {
       await redis.set(keys.metricas(novo), exemploMetricas);
       await redis.set(keys.evolucao(novo), exemploEvolucao.map((r) => ({ ...r, id: novoId('r'), criadoEm: cliente.criadoEm })));
     }
-    return res.status(200).json(cliente);
+    return res.status(200).json(comServicos(cliente));
   }
 
   const atual = await exigirAcessoCliente(usuario, id);
@@ -42,7 +58,7 @@ export default handler(async (req, res, usuario) => {
   if (req.method === 'PUT') {
     const cliente = { ...atual, ...limpar(corpo), id: atual.id };
     await redis.hset(keys.clientes, { [id]: cliente });
-    return res.status(200).json(cliente);
+    return res.status(200).json(comServicos(cliente));
   }
 
   // DELETE: apaga o cliente e tudo o que foi entregue a ele.
@@ -75,6 +91,7 @@ function limpar(c) {
     instagram: texto(c.instagram, 60).replace(/^@/, '').trim(),
     cor,
     ativo: c.ativo !== false,
+    servicos: (Array.isArray(c.servicos) ? c.servicos : []).map((s) => texto(s, 40)).filter((s) => /^[a-z0-9-]{2,40}$/.test(s)).slice(0, 20),
   };
 }
 
@@ -95,4 +112,22 @@ async function resumo(clienteId, mes) {
     seguidores: ultimoMes ? metricas[ultimoMes].seguidores : null,
     metricasMes: ultimoMes || null,
   };
+}
+
+export const SERVICOS_PADRAO = [
+  { id: 'editorial', nome: 'Consultoria editorial', cor: '#8a391b' },
+  { id: 'social', nome: 'Gestão de redes sociais', cor: '#3f6a8a' },
+  { id: 'trafego', nome: 'Tráfego pago', cor: '#4f7a52' },
+  { id: 'conteudo', nome: 'Produção de conteúdo', cor: '#b0813a' },
+  { id: 'branding', nome: 'Branding', cor: '#8a6a9a' },
+  { id: 'site', nome: 'Site', cor: '#5a5048' },
+];
+
+async function listarServicos() {
+  return (await getRedis().get(keys.servicos)) || SERVICOS_PADRAO;
+}
+
+// Clientes cadastrados antes das etiquetas eram todos da consultoria editorial.
+function comServicos(c) {
+  return { ...c, servicos: Array.isArray(c.servicos) ? c.servicos : ['editorial'] };
 }

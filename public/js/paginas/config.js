@@ -1,13 +1,20 @@
 // Configurações do cliente (só a Vie): dados do perfil, cor do portal e exclusão.
 import { api, esc, aviso, falhou, confirmar } from '../ui.js';
+import { escolhaServicos, lerServicosMarcados } from '../componentes/servicos.js';
 
-export function camposCliente(c = {}) {
+export function camposCliente(c = {}, servicos = []) {
   return `
+    <div class="campo largo"><span>Serviços prestados pela Vie</span>${escolhaServicos(c.servicos || [], servicos)}</div>
     <label class="campo largo"><span>Nome do cliente (aparece no portal)</span><input class="entrada" name="nome" value="${esc(c.nome || '')}" placeholder="Ex.: Dra. Izabella Rebello" autofocus></label>
     <label class="campo"><span>Como chamar na saudação</span><input class="entrada" name="tratamento" value="${esc(c.tratamento || '')}" placeholder="Ex.: Izabella"></label>
     <label class="campo"><span>Instagram</span><input class="entrada" name="instagram" value="${esc(c.instagram || '')}" placeholder="@perfil"></label>
     <label class="campo"><span>Especialidade</span><input class="entrada" name="especialidade" value="${esc(c.especialidade || '')}" placeholder="Ex.: Nutrologia, Odontologia"></label>
     <label class="campo"><span>Cor de destaque do portal</span><input class="entrada" type="color" name="cor" value="${esc(c.cor || '#8a391b')}" style="height:44px;padding:4px"></label>`;
+}
+
+// Lê o formulário de cliente (os serviços são várias caixinhas).
+export function lerCliente(form) {
+  return { ...Object.fromEntries(new FormData(form)), servicos: lerServicosMarcados(form) };
 }
 
 export async function render(el, ctx) {
@@ -16,7 +23,7 @@ export async function render(el, ctx) {
   el.innerHTML = `
     <section class="saudacao"><h1>Configurações</h1><p>Dados do cliente e aparência do portal dele.</p></section>
     <div class="cartao" style="margin-top:22px;max-width:760px">
-      <form class="grade-campos" data-form>${camposCliente(cliente)}</form>
+      <form class="grade-campos" data-form>${camposCliente(cliente, ctx.servicos())}</form>
       <div class="rodape-modal" style="justify-content:flex-start;margin-top:18px"><button class="btn acc" data-salvar>Salvar</button></div>
     </div>
     <div class="cartao" style="margin-top:18px;max-width:760px;border-color:color-mix(in srgb, var(--s-ajuste) 35%, transparent)">
@@ -26,7 +33,7 @@ export async function render(el, ctx) {
     </div>`;
 
   el.querySelector('[data-salvar]').onclick = async () => {
-    const dados = Object.fromEntries(new FormData(el.querySelector('[data-form]')));
+    const dados = lerCliente(el.querySelector('[data-form]'));
     try {
       const salvo = await api(`clientes?id=${encodeURIComponent(cliente.id)}`, { metodo: 'PUT', corpo: dados });
       ctx.atualizarCliente(salvo);

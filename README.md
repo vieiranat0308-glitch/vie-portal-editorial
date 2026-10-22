@@ -1,6 +1,10 @@
-# Vie Company · Portal Editorial
+# Vie Company · Portal Assessoria de Marketing
 
 Portal da **consultoria editorial** da Vie Company. A equipe Vie acompanha todos os clientes num só lugar, e cada cliente tem um **acesso exclusivo** para ver o que foi entregue a ele.
+
+## Serviços e etiquetas
+
+O portal reúne **todos os clientes da Vie**. Cada cliente recebe as etiquetas dos serviços que a Vie presta para ele (Consultoria editorial, Gestão de redes sociais, Tráfego pago, Produção de conteúdo, Branding, Site…). Na visão geral, dá para filtrar os clientes por serviço e ver quantos clientes há em cada um. A lista de serviços (nome e cor) é editada em **Serviços**, no menu da Vie. Os clientes cadastrados antes das etiquetas aparecem como Consultoria editorial.
 
 ## O que tem no portal
 
