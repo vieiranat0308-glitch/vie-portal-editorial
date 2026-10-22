@@ -60,6 +60,13 @@ Se o cronograma do mês é feito fora do portal (como os sites que vocês public
 
 Assim que o HTML sobe, o portal **lê os posts de dentro do arquivo**, sem IA e sem custo nenhum. Ele entende o modelo de cronograma da Vie: cada post do feed (`<article class="post" data-k="f-DDMM">`) e cada dia de stories (`<article class="day" data-k="s-DDMM">`), com data, dia e horário, pilar, formato, título, gancho, roteiro e referências. Com isso, alimenta a visão geral, o calendário, os próximos conteúdos e o fluxo do mês. Ao substituir o HTML, o que já estava aprovado ou postado continua marcado. Também há o botão **Ler os posts de novo**.
 
+O portal entende dois modelos de arquivo da Vie:
+
+- **Cronograma** (como o da Dra. Izabella): posts do feed (`<article class="post" data-k="f-DDMM">`) e dias de stories (`<article class="day" data-k="s-DDMM">`). As caixinhas **Feito** e **Publicado** marcam o conteúdo como **Postado**.
+- **Roteiros de gravação** (como o da Due Medicina): cada reel ou story é um `<section class="painel" id="a-DDMM">`, com quem grava, pilar, tema, gancho, cenas, direção e legenda. O botão **Marcar como gravado** marca o conteúdo como **Gravado**.
+
+Se o arquivo passa da virada do mês (por exemplo, de 22/10 a 24/11), cada mês fica com os conteúdos dele, e o portal avisa: suba o mesmo arquivo também no outro mês.
+
 **Caixinhas ligadas ao portal:** as caixinhas **Feito** (stories), **Publicado** (feed) e **Usada** (banco de ideias) do HTML ficam salvas no portal, e não só no navegador de quem marcou. Marcar **Feito** ou **Publicado** deixa o post como **Postado** na visão geral, e desmarcar volta para Aprovado. Quem abre o cronograma, em qualquer aparelho, vê as mesmas marcações.
 
 - Num mês em HTML, a aprovação é do **cronograma inteiro**: a faixa com **Aprovar cronograma** e **Pedir ajuste** aparece para o cliente na visão geral e na aba Cronograma. Aprovar o mês marca todos os posts como aprovados. A Vie pode **Marcar como aprovado** quando o cliente aprovar por outro canal.

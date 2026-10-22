@@ -106,10 +106,14 @@ export async function lerPostsDoHtml(ctx, mes, trilha = 'cliente') {
 export function avisarLeitura(doc, trilha = 'cliente') {
   const l = trilha === 'vie' ? doc.leituraHtmlVie : doc.leituraHtml;
   if (!l) return;
-  if (!l.total) {
+  if (!l.total && !l.foraDoMes) {
     aviso('Não encontrei posts neste HTML. Se ele estiver num formato diferente do modelo da Vie, me mande o arquivo para ajustar a leitura.', { erro: true });
     return;
   }
   const feed = doc.posts.filter((p) => (p.trilha === 'vie') === (trilha === 'vie') && p.formato !== 'story').length;
   aviso(`${l.total} conteúdos lidos do HTML (${feed} no feed e ${l.total - feed} de stories). A visão geral já está atualizada.`);
+  if (l.outrosMeses?.length) {
+    const meses = l.outrosMeses.map((m) => nomeDoMes(m).toLowerCase().replace(' ', ' de ')).join(' e ');
+    aviso(`${l.foraDoMes} ${l.foraDoMes === 1 ? 'conteúdo deste arquivo é' : 'conteúdos deste arquivo são'} de ${meses}. Suba o mesmo arquivo também ${l.outrosMeses.length === 1 ? 'nesse mês' : 'nesses meses'} para ${l.foraDoMes === 1 ? 'ele entrar' : 'eles entrarem'} no acompanhamento.`);
+  }
 }

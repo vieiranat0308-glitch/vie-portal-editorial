@@ -21,6 +21,7 @@ export async function render(el, ctx) {
   const chaveTrilha = `${ctx.usuario?.email}|${cliente.id}`;
   let trilha = separado ? trilhaSalva[chaveTrilha] || (admin ? 'vie' : 'cliente') : 'cliente';
   const nomeTrilha = { vie: 'Cronograma da Vie', cliente: admin ? 'Cronograma do cliente' : 'Seu cronograma' };
+  const nomeNaFrase = (t) => (t === 'vie' ? 'cronograma da Vie' : admin ? 'cronograma do cliente' : 'seu cronograma');
   const daTrilha = (p) => !separado || (p.trilha === 'vie' ? 'vie' : 'cliente') === trilha;
   const arquivoDaTrilha = () => (trilha === 'vie' ? doc.interativoVie : doc.interativo);
   const leituraDaTrilha = () => (trilha === 'vie' ? doc.leituraHtmlVie : doc.leituraHtml);
@@ -78,7 +79,7 @@ export async function render(el, ctx) {
         </div>` : ''}
       ${admin && doc.status !== 'publicado' ? `
         <div class="aviso-rascunho">
-          <span><b>Rascunho.</b> ${esc(cliente.nome)} ainda não vê este mês. ${html || posts.length ? 'Revise e libere quando estiver pronto.' : `Suba ${separado ? `o ${nomeTrilha[trilha].toLowerCase()}` : 'o cronograma'} pronto ou monte os conteúdos aqui no portal.`}</span>
+          <span><b>Rascunho.</b> ${esc(cliente.nome)} ainda não vê este mês. ${html || posts.length ? 'Revise e libere quando estiver pronto.' : `Suba ${separado ? `o ${nomeNaFrase(trilha)}` : 'o cronograma'} pronto ou monte os conteúdos aqui no portal.`}</span>
           ${!posts.length && !html ? `<button class="btn claro peq" data-subir>${icones.baixar}Subir cronograma pronto (HTML)</button><button class="btn fantasma peq" data-esqueleto>Montar pela linha editorial</button>` : ''}
           <button class="btn acc peq" data-publicar ${algumConteudo ? '' : 'disabled'}>Liberar para o cliente</button>
         </div>` : ''}
@@ -90,9 +91,9 @@ export async function render(el, ctx) {
           ${doc.observacoes ? `<p class="obs">${esc(doc.observacoes)}</p>` : ''}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-          ${admin && (html || posts.length) ? `<button class="btn claro peq" data-subir>${icones.baixar}${html ? 'Substituir HTML' : 'Subir cronograma pronto (HTML)'}</button>` : ''}
+          ${admin && (html || posts.length || doc.status === 'publicado') ? `<button class="btn claro peq" data-subir>${icones.baixar}${html ? 'Substituir HTML' : 'Subir cronograma pronto (HTML)'}</button>` : ''}
           ${admin ? `<button class="btn claro peq" data-foco>${icones.editar}Foco e recados</button>` : ''}
-          ${admin && posts.length ? '<button class="btn claro peq" data-esqueleto>Completar pela linha editorial</button>' : ''}
+          ${admin && (posts.length || (doc.status === 'publicado' && !html)) ? `<button class="btn claro peq" data-esqueleto>${posts.length ? 'Completar' : 'Montar'} pela linha editorial</button>` : ''}
           ${admin && doc.status === 'publicado' ? '<button class="btn fantasma peq" data-despublicar>Voltar para rascunho</button>' : ''}
           ${posts.length ? `<button class="btn claro peq" onclick="window.print()">${icones.imprimir}Imprimir</button>` : ''}
         </div>
@@ -115,7 +116,7 @@ export async function render(el, ctx) {
         ? 'Suba o cronograma pronto em HTML, ou monte os conteúdos aqui no portal (“Montar pela linha editorial” ou “Novo conteúdo”).'
         : separado && trilha === 'vie' ? 'Neste mês a equipe Vie ainda não colocou aqui o que vai produzir e publicar.'
           : separado ? 'Neste mês não há conteúdos para você gravar ou postar.' : '';
-      corpo.innerHTML = `<div class="vazio"><strong>Nenhum conteúdo ${separado ? `no ${nomeTrilha[trilha].toLowerCase()}` : 'neste mês'}</strong>${texto}</div>`;
+      corpo.innerHTML = `<div class="vazio"><strong>Nenhum conteúdo ${separado ? `no ${nomeNaFrase(trilha)}` : 'neste mês'}</strong>${texto}</div>`;
     } else if (visao === 'calendario') corpo.innerHTML = calendario(posts);
     else if (visao === 'lista') corpo.innerHTML = lista(posts);
     else if (visao === 'feed') corpo.innerHTML = previaFeed(posts);
@@ -210,7 +211,8 @@ export async function render(el, ctx) {
     const doHtml = (k) => (prefixo ? k.startsWith(prefixo) : !k.startsWith('vie:'));
     const feitos = {};
     Object.entries(doc.marcasHtml || {}).forEach(([k, v]) => { if (doHtml(k)) feitos[k.slice(prefixo.length)] = v; });
-    (doc.posts || []).forEach((p) => { if (p.chaveHtml && doHtml(p.chaveHtml)) feitos[p.chaveHtml.slice(prefixo.length)] = p.status === 'postado'; });
+    const feito = (p) => (p.marcaHtml === 'gravado' ? ['gravado', 'postado'].includes(p.status) : p.status === 'postado');
+    (doc.posts || []).forEach((p) => { if (p.chaveHtml && doHtml(p.chaveHtml)) feitos[p.chaveHtml.slice(prefixo.length)] = feito(p); });
     return feitos;
   }
   function ligarCaixinhas() {
@@ -284,13 +286,14 @@ export async function render(el, ctx) {
     const src = `/api/cronograma?cliente=${id}&mes=${mes}&interativo=1&trilha=${trilha}&v=${encodeURIComponent(arquivo.enviadoEm)}`;
     const conversa = doc.conversa || [];
     const l = leituraDaTrilha();
-    const marcarTexto = admin ? 'O que for marcado como Feito, Publicado ou Usada no cronograma atualiza a visão geral.'
+    const outros = admin && l?.outrosMeses?.length ? ` <b>${l.foraDoMes} ${l.foraDoMes === 1 ? 'conteúdo é' : 'conteúdos são'} de ${l.outrosMeses.map((m) => nomeDoMes(m).toLowerCase().replace(' ', ' de ')).join(' e ')}:</b> para ${l.foraDoMes === 1 ? 'ele entrar' : 'eles entrarem'} no acompanhamento, suba o mesmo arquivo também ${l.outrosMeses.length === 1 ? 'nesse mês' : 'nesses meses'}.` : '';
+    const marcarTexto = admin ? 'O que for marcado no cronograma (Feito, Publicado, Gravado ou Usada) atualiza a visão geral.'
       : trilha === 'vie' ? 'A equipe Vie marca aqui o que já foi publicado.'
-        : 'Marque Feito e Publicado aqui no cronograma: a equipe Vie acompanha pela visão geral.';
+        : 'Marque aqui no cronograma o que já foi feito (Feito, Publicado ou Gravado): a equipe Vie acompanha pela visão geral.';
     return `
       <div class="cartao" style="margin-bottom:16px;display:grid;gap:14px">
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-          <span class="muted" style="font-size:13px">Versão enviada em ${esc(quando(arquivo.enviadoEm))}${admin && l ? ` · ${l.total} ${l.total === 1 ? 'conteúdo lido' : 'conteúdos lidos'} para o acompanhamento` : ''}${admin && !l ? ' · os posts ainda não foram lidos para o acompanhamento' : ''}. ${marcarTexto}</span>
+          <span class="muted" style="font-size:13px">Versão enviada em ${esc(quando(arquivo.enviadoEm))}${admin && l ? ` · ${l.total} ${l.total === 1 ? 'conteúdo lido' : 'conteúdos lidos'} para o acompanhamento` : ''}${admin && !l ? ' · os posts ainda não foram lidos para o acompanhamento' : ''}. ${marcarTexto}${outros}</span>
           <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
             ${admin ? `<button class="btn claro peq" data-reler-html>${l ? 'Ler os posts de novo' : 'Ler os posts do HTML'}</button>` : ''}
             <a class="btn claro peq" href="${src}" target="_blank" rel="noopener">${icones.link}Abrir em tela cheia</a>

@@ -119,7 +119,9 @@ export default handler(async (req, res, usuario) => {
       const i = doc.posts.findIndex((p) => p.id === limpo.id);
       if (i >= 0) {
         const anterior = doc.posts[i];
-        doc.posts[i] = { ...limpo, comentarios: anterior.comentarios || [], statusPor: anterior.status === limpo.status ? anterior.statusPor : undefined };
+        // Editar um conteúdo lido do HTML mantém a ligação com a caixinha dele.
+        const doHtml = Object.fromEntries(['chaveHtml', 'marcaHtml', 'origem'].filter((k) => anterior[k]).map((k) => [k, anterior[k]]));
+        doc.posts[i] = { ...limpo, ...doHtml, comentarios: anterior.comentarios || [], statusPor: anterior.status === limpo.status ? anterior.statusPor : undefined };
       }
       else doc.posts.push({ ...limpo, comentarios: [] });
       break;
@@ -145,8 +147,11 @@ export default handler(async (req, res, usuario) => {
       doc.marcasHtml = { ...(doc.marcasHtml || {}), [chave]: !!corpo.feito };
       const alvo = doc.posts.find((p) => p.chaveHtml === chave);
       if (alvo) {
-        if (corpo.feito && alvo.status !== 'postado') { alvo.status = 'postado'; alvo.statusPor = assinatura; }
-        if (!corpo.feito && alvo.status === 'postado') {
+        // Nos roteiros de gravação o botão marca "gravado"; no cronograma, "postado".
+        const feito = statusDaMarca(alvo);
+        const jaFeito = feito === 'gravado' ? ['gravado', 'postado'] : ['postado'];
+        if (corpo.feito && !jaFeito.includes(alvo.status)) { alvo.status = feito; alvo.statusPor = assinatura; }
+        if (!corpo.feito && alvo.status === feito) {
           alvo.status = doc.aprovacaoMes?.status === 'aprovado' ? 'aprovado' : 'pauta';
           alvo.statusPor = assinatura;
         }
@@ -249,6 +254,8 @@ export default handler(async (req, res, usuario) => {
   res.status(200).json({ ...(admin ? doc : paraCliente(doc)), salvoId });
 });
 
+const statusDaMarca = (p) => (p.marcaHtml === 'gravado' ? 'gravado' : 'postado');
+
 function contar(posts) {
   const total = {};
   posts.forEach((p) => { total[p.status] = (total[p.status] || 0) + 1; });
@@ -302,7 +309,7 @@ function aplicarLeitura(doc, lidos, pilares, quando, trilha = 'cliente') {
     // O andamento já marcado (aprovado, gravado, postado) continua valendo na versão nova.
     const manter = antes && ['aprovado', 'gravado', 'postado'].includes(antes.status);
     let status = manter ? antes.status : (aprovado ? 'aprovado' : 'pauta');
-    if (marcas[p.chaveHtml]) status = 'postado';
+    if (marcas[p.chaveHtml] && !(p.marca === 'gravado' && status === 'postado')) status = p.marca === 'gravado' ? 'gravado' : 'postado';
     return {
       id: antes?.id || novoId('p'),
       chaveHtml: p.chaveHtml,
@@ -321,9 +328,12 @@ function aplicarLeitura(doc, lidos, pilares, quando, trilha = 'cliente') {
       comentarios: antes?.comentarios || [],
       ideiaId: null,
       origem: 'html',
+      ...(p.marca ? { marcaHtml: p.marca } : {}),
       ...(trilha === 'vie' ? { trilha } : {}),
     };
   }));
   doc.posts.sort((a, b) => (a.data + a.horario).localeCompare(b.data + b.horario));
-  doc[leitura] = { em: quando, total: doMes.length, foraDoMes: lidos.length - doMes.length };
+  // Arquivo que passa da virada do mês: avisa quais meses precisam do mesmo arquivo.
+  const outrosMeses = [...new Set(lidos.map((p) => p.data.slice(0, 7)).filter((m) => m !== anoMes))].sort();
+  doc[leitura] = { em: quando, total: doMes.length, foraDoMes: lidos.length - doMes.length, outrosMeses };
 }
