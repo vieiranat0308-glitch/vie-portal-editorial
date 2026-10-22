@@ -1,5 +1,5 @@
 // Aprovação: o que está esperando o cliente e o que o cliente pediu para ajustar.
-import { api, esc, falhou, dataLonga, quando } from '../ui.js';
+import { api, esc, aviso, falhou, abrirCamada, dataLonga, quando } from '../ui.js';
 import { corDoPilar, nomeDoMes } from '../regras.js';
 import { abrirPost, etiquetaFormato, etiquetaPilar, etiquetaStatus, capaDrive } from '../componentes/post.js';
 
@@ -32,12 +32,18 @@ export async function render(el, ctx) {
           <span style="margin-left:auto">${etiquetaStatus(p.status)}</span>
         </div>
         <div style="display:flex;gap:14px;align-items:flex-start">
-          ${p.midia?.length ? `<span class="miniatura-drive" style="background-image:url('${capaDrive(p.midia[0].id, 300)}')"></span>` : ''}
+          ${p.midia?.length ? `<button class="miniatura-drive grande" data-abrir="${p.mes}|${p.id}" title="Ver a arte" style="background-image:url('${capaDrive(p.midia[0].id, 400)}')"></button>` : ''}
           <h3 class="serif" style="font-size:22px;flex:1">${p.titulo ? esc(p.titulo) : '<span class="sem-titulo">Sem título</span>'}</h3>
         </div>
         ${p.gancho ? `<p class="citacao" style="font:400 16px/1.5 var(--sans);border-left:3px solid var(--acc);padding-left:14px">“${esc(p.gancho)}”</p>` : ''}
         ${ultimo ? `<div class="comentario${ultimo.admin ? ' vie' : ''}"><div class="quem"><b>${esc(ultimo.nome)}</b><span style="margin-left:auto">${esc(quando(ultimo.em))}</span></div><p>${esc(ultimo.texto)}</p></div>` : ''}
-        <div><button class="btn ${p.status === 'aprovacao' && !admin ? 'acc' : 'claro'} peq" data-abrir="${p.mes}|${p.id}">${p.status === 'aprovacao' && !admin ? 'Ver e aprovar' : 'Abrir conteúdo'}</button></div>
+        ${!admin && p.publicado ? `
+          <div class="botoes-aprovacao">
+            <button class="btn acc" data-aprovar="${p.mes}|${p.id}">✓ Aprovado</button>
+            <button class="btn claro" data-alterar="${p.mes}|${p.id}">Alterar</button>
+            <button class="btn fantasma peq" data-abrir="${p.mes}|${p.id}">Ver detalhes</button>
+          </div>`
+          : `<div><button class="btn claro peq" data-abrir="${p.mes}|${p.id}">Abrir conteúdo</button></div>`}
       </div>`;
   }
 
@@ -56,16 +62,59 @@ export async function render(el, ctx) {
             <span class="muted" style="font-size:13.5px">${m.aprovacaoMes === 'ajuste' ? (admin ? 'O cliente pediu ajuste.' : 'Você pediu ajuste. A equipe Vie está revisando.') : (admin ? 'Esperando a aprovação do cliente.' : 'Esperando a sua aprovação.')}</span>
           </div>
           ${etiquetaStatus(m.aprovacaoMes === 'ajuste' ? 'ajuste' : 'aprovacao')}
-          <a class="btn ${!admin && m.aprovacaoMes !== 'ajuste' ? 'acc' : 'claro'} peq" href="#${ctx.base}/cronograma/${m.mes}">Abrir cronograma</a>
+          <a class="btn claro peq" href="#${ctx.base}/cronograma/${m.mes}">Abrir cronograma</a>
+          ${!admin ? `<button class="btn acc peq" data-aprovar-mes="${m.mes}">✓ Aprovado</button>${m.aprovacaoMes !== 'ajuste' ? `<button class="btn claro peq" data-alterar-mes="${m.mes}">Alterar</button>` : ''}` : ''}
         </div>`).join('')}</div>` : '';
     el.innerHTML = `
       <section class="saudacao"><h1>Aprovação</h1><p>${admin
         ? 'Acompanhe o que está com o cliente e responda os pedidos de ajuste.'
-        : 'Aqui ficam os conteúdos que a equipe Vie preparou para você revisar. Aprove ou peça ajuste com um comentário.'}</p></section>
+        : 'Aqui ficam os conteúdos que a equipe Vie preparou para você. Toque em <b>Aprovado</b> ou em <b>Alterar</b> e conte o que mudar.'}</p></section>
       ${blocoMeses}
       ${(itens.length || !mesesInterativos.length ? secoes : []).map(([titulo, lista, vazio]) => `
         <div class="secao-titulo"><h2>${titulo}</h2><span class="etq">${lista.length}</span></div>
         ${lista.length ? `<div style="display:grid;gap:12px">${lista.map(bloco).join('')}</div>` : `<div class="vazio">${vazio}</div>`}`).join('')}`;
+    const enviar = async (mes, corpo, mensagem) => {
+      try {
+        await api(`cronograma?cliente=${id}&mes=${mes}`, { metodo: 'POST', corpo });
+        aviso(mensagem);
+        ctx.atualizarContadores?.();
+        await carregar();
+        desenhar();
+      } catch (err) { falhou(err); }
+    };
+    // "Alterar" pede o que mudar: a equipe Vie recebe junto com o pedido.
+    const pedirAlteracao = (titulo, aoEnviar) => {
+      const m = abrirCamada(`
+        <h2>O que você quer alterar?</h2>
+        <p class="muted">${esc(titulo)}</p>
+        <textarea class="entrada" rows="5" autofocus placeholder="Ex.: trocar a foto da capa, mudar o texto do slide 3…"></textarea>
+        <div class="rodape-modal"><button class="btn claro" data-fechar>Cancelar</button><button class="btn acc" data-ok>Enviar para a Vie</button></div>`);
+      m.el.querySelector('[data-ok]').onclick = async () => {
+        const comentario = m.el.querySelector('textarea').value.trim();
+        if (!comentario) return aviso('Conte rapidinho o que alterar.', { erro: true });
+        m.fechar();
+        await aoEnviar(comentario);
+      };
+    };
+    el.querySelectorAll('[data-aprovar]').forEach((b) => {
+      b.onclick = () => {
+        const [mes, postId] = b.dataset.aprovar.split('|');
+        b.disabled = true;
+        enviar(mes, { acao: 'status', postId, status: 'aprovado' }, 'Aprovado! A equipe Vie já foi avisada.');
+      };
+    });
+    el.querySelectorAll('[data-alterar]').forEach((b) => {
+      b.onclick = () => {
+        const [mes, postId] = b.dataset.alterar.split('|');
+        pedirAlteracao(itens.find((p) => p.id === postId)?.titulo || '', (comentario) => enviar(mes, { acao: 'status', postId, status: 'ajuste', comentario }, 'Pedido de alteração enviado para a equipe Vie.'));
+      };
+    });
+    el.querySelectorAll('[data-aprovar-mes]').forEach((b) => {
+      b.onclick = () => { b.disabled = true; enviar(b.dataset.aprovarMes, { acao: 'aprovar-mes' }, 'Cronograma aprovado. Obrigada!'); };
+    });
+    el.querySelectorAll('[data-alterar-mes]').forEach((b) => {
+      b.onclick = () => pedirAlteracao(`Cronograma de ${nomeDoMes(b.dataset.alterarMes)}`, (comentario) => enviar(b.dataset.alterarMes, { acao: 'ajuste-mes', comentario }, 'Pedido de alteração enviado para a equipe Vie.'));
+    });
     el.querySelectorAll('[data-abrir]').forEach((b) => {
       b.onclick = () => {
         const [mes, postId] = b.dataset.abrir.split('|');

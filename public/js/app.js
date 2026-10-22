@@ -2,6 +2,7 @@
 import { api, esc, aviso, falhou, abrirCamada, lerCampos, icones, iniciais } from './ui.js';
 import { etiquetasServicos } from './componentes/servicos.js';
 import { iniciarApp, paginaInstalar, abrirComoInstalar, mostrarInstalar, aoMudarInstalacao, jaInstalado } from './instalar.js';
+import { situacao as situacaoAvisos, ativar as ativarAvisos, desativar as desativarAvisos, testar as testarAvisos } from './notificacoes.js';
 
 const estado = { usuario: null, clienteProprio: null, clientes: null, servicos: null, cache: {} };
 const app = document.getElementById('app');
@@ -199,6 +200,7 @@ function moldura({ marcaHtml, menuHtml, titulo }) {
         <div class="rodape">
           <div class="usuario"><span class="avatar">${esc(iniciais(u.nome))}</span><div><div class="nome">${esc(u.nome)}</div><div class="sub">${u.role === 'admin' ? 'Equipe Vie' : 'Cliente'}</div></div></div>
           <button class="instalar-app" data-instalar-app hidden>${icones.baixar}<span>Instalar app no celular</span></button>
+          <button class="instalar-app" data-ativar-avisos hidden>${icones.sino}<span>Ativar notificações</span></button>
           <div class="acoes"><button data-conta>Minha conta</button><button data-sair>Sair</button></div>
           ${u.role === 'admin' ? '' : '<div class="assinatura"><img src="/img/logo-creme.png" alt="Vie Company"><span>Assessoria de marketing</span></div>'}
         </div>
@@ -223,6 +225,11 @@ function moldura({ marcaHtml, menuHtml, titulo }) {
   instalar.onclick = abrirComoInstalar;
   mostrar();
   const parar = aoMudarInstalacao(() => (document.body.contains(instalar) ? mostrar() : parar()));
+  const botaoAvisos = app.querySelector('[data-ativar-avisos]');
+  situacaoAvisos().then((s) => { botaoAvisos.hidden = !['desligado', 'instalar'].includes(s); }).catch(() => {});
+  botaoAvisos.onclick = async () => {
+    if (await ligarAvisos()) botaoAvisos.hidden = true;
+  };
   return app.querySelector('#conteudo');
 }
 
@@ -282,12 +289,14 @@ function abasDoCliente(cliente) {
 async function telaVie(rota) {
   document.documentElement.style.setProperty('--acc', '#8a391b');
   document.title = 'Vie Company · Portal Assessoria de Marketing';
+  // Serviços e Equipe Vie ficam com quem enxerga todos os clientes.
+  if (!equipeCompleta() && rota.pagina !== 'inicio') return ir('/');
   if (!estado.clientes) estado.clientes = await api('clientes').catch(() => []);
   const menuHtml = `
     <div class="grupo"><span class="mono">Geral</span>
       <a class="nav-item${rota.pagina === 'inicio' ? ' ativo' : ''}" href="#/">${icones.geral}<span>Visão geral</span></a>
-      <a class="nav-item${rota.pagina === 'servicos' ? ' ativo' : ''}" href="#/servicos">${icones.ajustes}<span>Serviços</span></a>
-      <a class="nav-item${rota.pagina === 'equipe' ? ' ativo' : ''}" href="#/equipe">${icones.pessoas}<span>Equipe Vie</span></a>
+      ${equipeCompleta() ? `<a class="nav-item${rota.pagina === 'servicos' ? ' ativo' : ''}" href="#/servicos">${icones.ajustes}<span>Serviços</span></a>
+      <a class="nav-item${rota.pagina === 'equipe' ? ' ativo' : ''}" href="#/equipe">${icones.pessoas}<span>Equipe Vie</span></a>` : ''}
     </div>
     <div class="grupo"><span class="mono">Clientes</span>
       ${estado.clientes.map((c) => `<a class="nav-item" href="#/c/${encodeURIComponent(c.id)}"><span class="bolinha" style="--cor:${esc(c.cor)}"></span><span>${esc(c.nome)}</span></a>`).join('') || '<span class="nav-item" style="opacity:.6">Nenhum cliente ainda</span>'}
@@ -298,10 +307,14 @@ async function telaVie(rota) {
   await carregarPagina('vie', conteudo, ctx);
 }
 
+// Pessoa da equipe sem lista de clientes vê todos e cuida das configurações gerais.
+const equipeCompleta = () => estado.usuario?.role === 'admin' && !Array.isArray(estado.usuario.clientes);
+
 function criarContexto({ cliente, admin, rota, conteudo }) {
   return {
     cliente,
     admin,
+    equipeCompleta: equipeCompleta(),
     rota,
     usuario: estado.usuario,
     conteudo,
@@ -362,11 +375,33 @@ async function sair() {
   location.hash = '#/login';
 }
 
+// Liga as notificações neste aparelho (no iPhone, só com o app instalado).
+async function ligarAvisos() {
+  const s = await situacaoAvisos();
+  if (s === 'instalar') {
+    aviso('No iPhone, as notificações chegam pelo app: instale o portal na tela de início e ative por lá.');
+    abrirComoInstalar();
+    return false;
+  }
+  if (s === 'bloqueado') { aviso('As notificações estão bloqueadas para o portal. Libere nas configurações do celular ou do navegador.', { erro: true }); return false; }
+  if (s === 'sem-suporte') { aviso('Este navegador não recebe notificações.', { erro: true }); return false; }
+  try {
+    await ativarAvisos();
+    await testarAvisos().catch(() => {});
+    aviso('Notificações ativadas neste aparelho.');
+    return true;
+  } catch (err) {
+    falhou(err);
+    return false;
+  }
+}
+
 function minhaConta() {
   const u = estado.usuario;
   const { el, fechar } = abrirCamada(`
     <h2>Minha conta</h2>
     <p class="muted">${esc(u.nome)} · ${esc(u.email)}</p>
+    <div class="cartao-avisos" data-avisos><span class="muted">Verificando notificações…</span></div>
     ${u.mestre ? '<p>Esta é a conta principal da Vie. A senha dela é definida na Vercel, na variável <b>ADMIN_PASSWORD</b>.</p>' : `
     <form class="grade-campos" style="grid-template-columns:1fr">
       <label class="campo"><span>Senha atual</span><input class="entrada" type="password" name="atual" autocomplete="current-password" required></label>
@@ -376,6 +411,24 @@ function minhaConta() {
       <button class="btn claro" data-fechar>Fechar</button>
       ${u.mestre ? '' : '<button class="btn acc" data-salvar>Alterar senha</button>'}
     </div>`);
+  const caixa = el.querySelector('[data-avisos]');
+  const textos = {
+    ativo: ['Notificações ativadas neste aparelho.', '<button class="btn claro peq" data-testar>Enviar teste</button><button class="btn fantasma peq" data-desligar>Desativar</button>'],
+    desligado: ['Receba no celular os avisos do portal: o que gravar no dia e o que está esperando aprovação.', '<button class="btn acc peq" data-ligar>Ativar notificações</button>'],
+    instalar: ['No iPhone, as notificações chegam pelo app instalado na tela de início.', '<button class="btn acc peq" data-ligar>Como instalar</button>'],
+    bloqueado: ['As notificações estão bloqueadas para o portal neste aparelho. Libere nas configurações do celular ou do navegador.', ''],
+    'sem-suporte': ['Este navegador não recebe notificações.', ''],
+  };
+  const desenharAvisos = async () => {
+    const [texto, botoes] = textos[await situacaoAvisos().catch(() => 'sem-suporte')];
+    caixa.innerHTML = `<b>Notificações</b><p class="muted" style="font-size:13.5px">${texto}</p>${botoes ? `<div style="display:flex;gap:8px;flex-wrap:wrap">${botoes}</div>` : ''}`;
+    caixa.querySelector('[data-ligar]')?.addEventListener('click', async () => { await ligarAvisos(); desenharAvisos(); });
+    caixa.querySelector('[data-testar]')?.addEventListener('click', async () => {
+      try { await testarAvisos(); aviso('Notificação de teste enviada.'); } catch (err) { falhou(err); }
+    });
+    caixa.querySelector('[data-desligar]')?.addEventListener('click', async () => { await desativarAvisos(); aviso('Notificações desativadas neste aparelho.'); desenharAvisos(); });
+  };
+  desenharAvisos();
   el.querySelector('[data-salvar]')?.addEventListener('click', async () => {
     try {
       await api('auth', { metodo: 'POST', corpo: { acao: 'senha', ...lerCampos(el) } });

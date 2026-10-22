@@ -1,5 +1,5 @@
 import {
-  handler, metodo, exigirAdmin, exigirAcessoCliente, HttpError, getRedis, keys, slugify, texto, novoId,
+  handler, metodo, exigirAdmin, exigirEquipeCompleta, exigirAcessoCliente, podeVerCliente, HttpError, getRedis, keys, slugify, texto, novoId,
 } from '../lib/base.js';
 import { temInterativo, garantirLeitura } from './cronograma.js';
 import { exemploCliente, exemploEditorial, exemploIdeias, exemploMetricas, exemploEvolucao } from '../lib/exemplo.js';
@@ -12,7 +12,7 @@ export default handler(async (req, res, usuario) => {
   // Serviços prestados pela Vie (as etiquetas dos clientes). Todos leem; só a Vie edita.
   if (req.query.servicos) {
     if (req.method === 'GET') return res.status(200).json(await listarServicos());
-    exigirAdmin(usuario);
+    exigirEquipeCompleta(usuario);
     metodo(req, 'PUT');
     const lista = (Array.isArray(req.body) ? req.body : []).slice(0, 30).map((s) => ({
       id: /^[a-z0-9-]{2,40}$/.test(s.id || '') ? s.id : slugify(s.nome),
@@ -31,7 +31,8 @@ export default handler(async (req, res, usuario) => {
     if (id) return res.status(200).json(comServicos(await exigirAcessoCliente(usuario, id)));
     exigirAdmin(usuario);
     const mes = /^\d{4}-\d{2}$/.test(req.query.mes || '') ? req.query.mes : new Date().toISOString().slice(0, 7);
-    const clientes = Object.values((await redis.hgetall(keys.clientes)) || {});
+    // Quem da equipe tem uma lista de clientes só vê os dela.
+    const clientes = Object.values((await redis.hgetall(keys.clientes)) || {}).filter((c) => podeVerCliente(usuario, c.id));
     const lista = await Promise.all(clientes.map(async (c) => ({ ...comServicos(c), resumo: await resumo(c.id, mes) })));
     lista.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     return res.status(200).json(lista);
@@ -41,6 +42,7 @@ export default handler(async (req, res, usuario) => {
   const corpo = req.body || {};
 
   if (req.method === 'POST') {
+    exigirEquipeCompleta(usuario);
     const base = corpo.exemplo ? exemploCliente : corpo;
     if (!String(base.nome || '').trim()) throw new HttpError(400, 'Informe o nome do cliente.');
     let novo = slugify(base.nome);
@@ -65,6 +67,7 @@ export default handler(async (req, res, usuario) => {
   }
 
   // DELETE: apaga o cliente e tudo o que foi entregue a ele.
+  exigirEquipeCompleta(usuario);
   const meses = await redis.smembers(keys.meses(id));
   const docs = (await redis.get(keys.documentos(id))) || [];
   const usuarios = Object.values((await redis.hgetall(keys.usuarios)) || {}).filter((u) => u.clienteId === id);

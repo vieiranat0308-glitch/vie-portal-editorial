@@ -4,7 +4,8 @@ import {
 import { salvarArquivo, lerArquivo, apagarArquivo } from '../lib/arquivos.js';
 import { lerCronogramaHtml, SCRIPT_PONTE, VERSAO_LEITURA } from '../lib/cronograma-html.js';
 import { lerConteudosDoDrive, idDaPasta, ErroDrive } from '../lib/drive.js';
-import { FORMATOS, STATUS, STATUS_DO_CLIENTE, gerarEsqueleto } from '../public/js/regras.js';
+import { avisarCliente, avisarEquipe } from '../lib/push.js';
+import { FORMATOS, STATUS, STATUS_DO_CLIENTE, gerarEsqueleto, nomeDoMes } from '../public/js/regras.js';
 
 // Cronograma mensal: cada mês é um documento com os conteúdos (feed e stories).
 // O cliente só enxerga o mês depois que a Vie publica.
@@ -24,7 +25,7 @@ export const temInterativo = (d) => !!(d?.interativo || d?.interativoVie);
 export default handler(async (req, res, usuario) => {
   metodo(req, 'GET', 'POST');
   const clienteId = String(req.query.cliente || '');
-  await exigirAcessoCliente(usuario, clienteId);
+  const cliente = await exigirAcessoCliente(usuario, clienteId);
   const redis = getRedis();
   const admin = usuario.role === 'admin';
 
@@ -87,6 +88,9 @@ export default handler(async (req, res, usuario) => {
     doc.atualizadoEm = doc[campoArquivo].enviadoEm;
     await redis.set(chave, doc);
     await redis.sadd(keys.meses(clienteId), mes);
+    if (doc.status === 'publicado') {
+      await avisarCliente(clienteId, { titulo: 'Tem cronograma para você aprovar! ✨', corpo: `A versão nova do cronograma de ${nomeDoMes(mes).split(' ')[0].toLowerCase()} está no portal.`, url: `/#/c/${encodeURIComponent(clienteId)}/cronograma/${mes}` });
+    }
     return res.status(200).json(doc);
   }
 
@@ -101,6 +105,9 @@ export default handler(async (req, res, usuario) => {
   const corpo = req.body || {};
   const post = corpo.postId ? doc.posts.find((p) => p.id === corpo.postId) : null;
   let salvoId = null;
+  // Para os avisos no celular: o que estava liberado e esperando aprovação antes da ação.
+  const estavaPublicado = doc.status === 'publicado';
+  const esperavamAntes = new Set(doc.posts.filter((p) => p.status === 'aprovacao').map((p) => p.id));
   const assinatura = { nome: usuario.nome, email: usuario.email, admin, em: new Date().toISOString() };
 
   switch (corpo.acao) {
@@ -271,8 +278,40 @@ export default handler(async (req, res, usuario) => {
   doc.atualizadoEm = assinatura.em;
   await redis.set(chave, doc);
   await redis.sadd(keys.meses(clienteId), mes);
+  await enviarAvisos({ corpo, doc, post, cliente, usuario, admin, mes, estavaPublicado, esperavamAntes });
   res.status(200).json({ ...(admin ? doc : paraCliente(doc)), salvoId });
 });
+
+// Avisos no celular: a Vie avisa o cliente quando há algo para aprovar,
+// e o cliente avisa a equipe quando aprova, pede alteração ou comenta.
+async function enviarAvisos({ corpo, doc, post, cliente, usuario, admin, mes, estavaPublicado, esperavamAntes }) {
+  const base = `/#/c/${encodeURIComponent(cliente.id)}`;
+  const nomeMes = nomeDoMes(mes).split(' ')[0].toLowerCase();
+  const titulo = (p) => `“${String(p?.titulo || 'conteúdo').slice(0, 60)}”`;
+  if (admin) {
+    if (doc.status !== 'publicado') return;
+    const novos = doc.posts.filter((p) => p.status === 'aprovacao' && !esperavamAntes.has(p.id)).length;
+    if (!estavaPublicado) {
+      await avisarCliente(cliente.id, { titulo: 'Tem cronograma para você aprovar! ✨', corpo: `O cronograma de ${nomeMes} está pronto no portal.`, url: `${base}/${novos ? 'aprovacao' : `cronograma/${mes}`}` });
+    } else if (novos) {
+      await avisarCliente(cliente.id, { titulo: 'Tem cronograma para você aprovar! ✨', corpo: `${novos} ${novos === 1 ? 'conteúdo novo esperando' : 'conteúdos novos esperando'} a sua aprovação.`, url: `${base}/aprovacao` });
+    } else if (['comentar', 'comentar-mes'].includes(corpo.acao)) {
+      await avisarCliente(cliente.id, { titulo: 'A equipe Vie respondeu', corpo: String(corpo.texto || '').slice(0, 140), url: `${base}/cronograma/${mes}` });
+    }
+    return;
+  }
+  const quem = usuario.nome || cliente.nome;
+  const avisos = {
+    status: corpo.status === 'aprovado' ? [`${cliente.nome} aprovou ✓`, `${quem} aprovou ${titulo(post)}.`]
+      : corpo.status === 'ajuste' ? [`${cliente.nome} pediu alteração`, `${titulo(post)}: ${String(corpo.comentario || '').slice(0, 120)}`]
+        : null,
+    'aprovar-mes': [`${cliente.nome} aprovou o cronograma ✓`, `Cronograma de ${nomeMes} aprovado por ${quem}.`],
+    'ajuste-mes': [`${cliente.nome} pediu alteração no cronograma`, String(corpo.comentario || '').slice(0, 140)],
+    comentar: [`Comentário de ${cliente.nome}`, `${titulo(post)}: ${String(corpo.texto || '').slice(0, 120)}`],
+    'comentar-mes': [`Comentário de ${cliente.nome}`, String(corpo.texto || '').slice(0, 140)],
+  }[corpo.acao];
+  if (avisos) await avisarEquipe({ titulo: avisos[0], corpo: avisos[1], url: `${base}/aprovacao` }, cliente.id);
+}
 
 // HTML enviado antes de a leitura entender o modelo dele: lê de novo e salva, uma vez só.
 export async function garantirLeitura(clienteId, doc) {

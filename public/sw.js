@@ -2,7 +2,7 @@
 // de "sem internet" quando o celular está offline.
 // Tudo vem primeiro da rede, para cada atualização do portal chegar na hora;
 // o que fica guardado só é usado sem conexão. A API nunca é guardada.
-const VERSAO = 'vie-v1';
+const VERSAO = 'vie-v2';
 const ESSENCIAIS = ['/offline.html', '/img/logo-creme.png', '/img/app-192.png'];
 
 self.addEventListener('install', (e) => {
@@ -37,4 +37,28 @@ self.addEventListener('fetch', (e) => {
       })
       .catch(() => caches.match(request).then((r) => r || Response.error())),
   );
+});
+
+// Notificações push do portal (aprovações, lembretes de gravação…).
+self.addEventListener('push', (e) => {
+  let dados = {};
+  try { dados = e.data ? e.data.json() : {}; } catch { dados = { corpo: e.data?.text() }; }
+  e.waitUntil(self.registration.showNotification(dados.titulo || 'Vie Company', {
+    body: dados.corpo || '',
+    icon: '/img/app-192.png',
+    badge: '/img/app-192.png',
+    tag: dados.tag || undefined,
+    data: { url: dados.url || '/' },
+  }));
+});
+
+// Tocar na notificação abre (ou traz para frente) o portal na página certa.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const destino = new URL(e.notification.data?.url || '/', self.location.origin).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((janelas) => {
+    const aberta = janelas.find((j) => new URL(j.url).origin === self.location.origin);
+    if (aberta) return aberta.focus().then(() => aberta.navigate(destino)).catch(() => self.clients.openWindow(destino));
+    return self.clients.openWindow(destino);
+  }));
 });

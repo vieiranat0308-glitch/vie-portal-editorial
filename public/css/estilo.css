@@ -610,3 +610,16 @@ textarea.entrada { resize: vertical; min-height: 84px; line-height: 1.5; }
 .bloco-feed.com-arte .rodape-bloco { background: rgba(20, 12, 10, .55); margin: 0 -12px -12px; padding: 6px 12px; }
 .galeria-drive img { width: 100%; aspect-ratio: 4 / 5; object-fit: contain; border-radius: 14px; background: var(--surface); display: block; }
 .galeria-drive.vertical img { aspect-ratio: 9 / 16; }
+.botoes-aprovacao { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.botoes-aprovacao .btn:not(.peq) { min-width: 130px; justify-content: center; }
+.miniatura-drive.grande { width: 96px; height: 120px; border: 0; cursor: pointer; padding: 0; }
+
+/* Equipe: quais clientes cada pessoa vê */
+.escolha-clientes { display: grid; gap: 10px; margin-top: 16px; }
+.escolha-clientes .opcao-todos { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 14.5px; }
+.escolha-clientes .lista-clientes { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; max-height: 260px; overflow-y: auto; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.escolha-clientes .lista-clientes[hidden] { display: none; }
+.escolha-clientes .lista-clientes label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.escolha-clientes .bolinha { width: 9px; height: 9px; border-radius: 50%; background: var(--cor); flex: none; }
+.acesso-clientes { font-size: 12.5px; color: var(--acc); margin-top: 2px; }
+.cartao-avisos { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); margin: 6px 0 14px; }

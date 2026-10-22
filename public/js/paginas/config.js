@@ -26,11 +26,11 @@ export async function render(el, ctx) {
       <form class="grade-campos" data-form>${camposCliente(cliente, ctx.servicos())}</form>
       <div class="rodape-modal" style="justify-content:flex-start;margin-top:18px"><button class="btn acc" data-salvar>Salvar</button></div>
     </div>
-    <div class="cartao" style="margin-top:18px;max-width:760px;border-color:color-mix(in srgb, var(--s-ajuste) 35%, transparent)">
+    ${ctx.equipeCompleta ? `<div class="cartao" style="margin-top:18px;max-width:760px;border-color:color-mix(in srgb, var(--s-ajuste) 35%, transparent)">
       <div class="cab"><h3>Excluir cliente</h3></div>
       <p class="muted">Apaga a linha editorial, os cronogramas, ideias, métricas, documentos e os acessos deste cliente. Não dá para desfazer.</p>
       <button class="btn perigo" style="margin-top:14px" data-excluir>Excluir ${esc(cliente.nome)}</button>
-    </div>`;
+    </div>` : ''}`;
 
   el.querySelector('[data-salvar]').onclick = async () => {
     const dados = lerCliente(el.querySelector('[data-form]'));
@@ -41,7 +41,8 @@ export async function render(el, ctx) {
       ctx.ir(`${ctx.base}/config`);
     } catch (err) { falhou(err); }
   };
-  el.querySelector('[data-excluir]').onclick = async () => {
+  const excluir = el.querySelector('[data-excluir]');
+  if (excluir) excluir.onclick = async () => {
     if (!(await confirmar(`Todos os dados de ${cliente.nome} serão apagados para sempre.`, { botao: 'Excluir definitivamente', perigo: true }))) return;
     try {
       await api(`clientes?id=${encodeURIComponent(cliente.id)}`, { metodo: 'DELETE' });

@@ -146,11 +146,11 @@ export async function render(el, ctx) {
 
         <div class="coluna">
           <div class="cartao" data-cal></div>
-          <div class="cartao">
+          ${separado ? '' /* Gestão de Instagram: o dia a dia está nas listas "produzir" e "a Vie vai publicar" */ : `<div class="cartao">
             <div class="cab"><h3>${selecionado === hoje ? 'Hoje' : esc(dataLonga(selecionado))}</h3><span class="mono">Feed e stories</span></div>
             ${doDia.length ? `<div class="lista-conteudos">${doDia.map((p) => itemConteudo(p, hoje, true)).join('')}</div>` : '<p class="muted" style="font-size:14px">Nada programado para este dia.</p>'}
             ${storiesDoDia(editorial, selecionado)}
-          </div>
+          </div>`}
           <a class="btn bloco" href="#${ctx.base}/cronograma/${mes}">Ver calendário completo</a>
         </div>
       </div>`;

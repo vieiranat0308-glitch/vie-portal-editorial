@@ -56,6 +56,7 @@ export default handler(async (req, res, usuario) => {
         nome: texto(corpo.nome || convite.nome, 120),
         role: convite.role === 'admin' ? 'admin' : 'cliente',
         clienteId: convite.role === 'admin' ? null : convite.clienteId,
+        ...(convite.role === 'admin' && Array.isArray(convite.clientes) ? { clientes: convite.clientes } : {}),
         salt,
         hash,
         criadoEm: new Date().toISOString(),

@@ -106,6 +106,22 @@ O portal é um app instalável (PWA), sem loja e sem custo: fica com o ícone da
 - Sem internet, o app mostra um aviso no lugar da tela de login e reabre sozinho quando a conexão volta.
 - Arquivos: `public/manifest.webmanifest`, `public/sw.js` (guarda só o necessário para o aviso offline; a API nunca é guardada), `public/offline.html`, `public/js/instalar.js` e os ícones `public/img/app-*.png` e `apple-touch-icon.png`.
 
+## Equipe Vie: quem vê quais clientes
+
+Em **Equipe Vie** → **Convidar**, escolha **Todos os clientes** (inclusive os que forem cadastrados depois) ou marque só os clientes daquela pessoa. O botão **Clientes** ao lado de cada pessoa muda isso depois.
+
+- Quem tem uma lista de clientes só vê e edita esses clientes (a checagem é no servidor) e só recebe as notificações deles.
+- Serviços, Equipe Vie, criar e excluir clientes ficam com quem vê todos os clientes.
+
+## Notificações no celular
+
+Notificações push pelo padrão aberto dos navegadores (Web Push): grátis, sem serviço pago e sem configurar nada (o portal cria as próprias chaves e guarda no banco; dá para fixar com `VAPID_PUBLIC_KEY` e `VAPID_PRIVATE_KEY`).
+
+- Cada pessoa ativa no próprio aparelho: botão **Ativar notificações** no menu ou em **Minha conta** (lá também tem “Enviar teste”). No iPhone, as notificações chegam pelo app instalado na tela de início (iOS 16.4 ou mais novo).
+- **Todo dia de manhã** (agendamento da Vercel em `vercel.json`, 8h de Brasília) o cliente recebe: **Grave seu story de hoje**, **Grave o reels de hoje** (com o tema) e **Tem cronograma para você aprovar!** (quando há algo esperando).
+- **Na hora:** o cliente é avisado quando o mês é liberado, quando entra conteúdo novo para aprovar e quando a Vie responde um comentário; a equipe é avisada quando o cliente aprova, pede alteração ou comenta.
+- Opcional: a variável `CRON_SECRET` protege a rotina diária com uma senha (a Vercel já envia sozinha).
+
 ## Identidade visual
 
 - Logos em `public/img/` (`logo-creme.png` para fundos escuros, `logo-terracota.png` para fundos claros) e ícone da aba em `icone.png`.

@@ -28,8 +28,8 @@ export async function render(el, ctx) {
       <strong data-mes></strong>
       <button data-ir="1" aria-label="Próximo mês">${icones.direita}</button>
     </div>
-    <button class="btn" data-novo><span>Novo cliente</span><span class="mais">+</span></button>`);
-  acoes.querySelector('[data-novo]').onclick = () => novoCliente(ctx);
+    ${ctx.equipeCompleta ? '<button class="btn" data-novo><span>Novo cliente</span><span class="mais">+</span></button>' : ''}`);
+  acoes.querySelector('[data-novo]')?.addEventListener('click', () => novoCliente(ctx));
   acoes.querySelectorAll('[data-ir]').forEach((b) => {
     b.onclick = async () => { mes = somarMes(mes, Number(b.dataset.ir)); await carregar(); };
   });
@@ -80,7 +80,7 @@ export async function render(el, ctx) {
 
       ${visiveis.length ? `<div class="grade-clientes">${visiveis.map((c) => cartao(c, servicos)).join('')}</div>`
         : clientes.length ? '<div class="vazio" style="margin-top:22px">Nenhum cliente com este serviço.</div>'
-        : '<div class="vazio" style="margin-top:22px"><strong>Nenhum cliente ainda</strong>Clique em “Novo cliente”. Você pode começar pelo exemplo da Dra. Izabella para ver o portal funcionando.</div>'}`;
+        : `<div class="vazio" style="margin-top:22px"><strong>Nenhum cliente ainda</strong>${ctx.equipeCompleta ? 'Clique em “Novo cliente”. Você pode começar pelo exemplo da Dra. Izabella para ver o portal funcionando.' : 'Ainda não há clientes liberados para você. Fale com a coordenação da Vie.'}</div>`}`;
 
     el.querySelectorAll('[data-servico]').forEach((b) => { b.onclick = () => { filtroServico = b.dataset.servico; desenhar(); }; });
   }
