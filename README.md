@@ -75,6 +75,17 @@ Regras do arquivo: um único `.html` de até 4 MB (imagens dentro do arquivo ou 
 4. O cliente aprova ou pede ajuste. Os pedidos aparecem na visão geral da Vie e na página **Aprovação**.
 5. No acompanhamento mensal, registre as **métricas** e suba os **documentos**.
 
+## App no celular (iPhone e Android)
+
+O portal é um app instalável (PWA), sem loja e sem custo: fica com o ícone da Vie na tela do celular, abre em tela cheia, já logado, e se atualiza sozinho a cada deploy.
+
+- **iPhone:** abrir o portal no Safari → Compartilhar → **Adicionar à Tela de Início**.
+- **Android:** no Chrome, **Instalar app** (ou menu ⋮ → Instalar app).
+- A página **`/#/instalar`** explica o passo a passo para o aparelho de quem abre, e não precisa de login. O link vai junto na mensagem de convite do cliente.
+- No menu lateral aparece **Instalar app no celular** enquanto o app não está instalado naquele aparelho. No primeiro acesso pelo celular, depois de criar a senha, o portal já sugere instalar.
+- Sem internet, o app mostra um aviso no lugar da tela de login e reabre sozinho quando a conexão volta.
+- Arquivos: `public/manifest.webmanifest`, `public/sw.js` (guarda só o necessário para o aviso offline; a API nunca é guardada), `public/offline.html`, `public/js/instalar.js` e os ícones `public/img/app-*.png` e `apple-touch-icon.png`.
+
 ## Identidade visual
 
 - Logos em `public/img/` (`logo-creme.png` para fundos escuros, `logo-terracota.png` para fundos claros) e ícone da aba em `icone.png`.

@@ -1,6 +1,7 @@
 // Portal Assessoria de Marketing · Vie Company: inicialização, rotas e estrutura das telas.
 import { api, esc, aviso, falhou, abrirCamada, lerCampos, icones, iniciais } from './ui.js';
 import { etiquetasServicos } from './componentes/servicos.js';
+import { iniciarApp, paginaInstalar, abrirComoInstalar, mostrarInstalar, aoMudarInstalacao, jaInstalado } from './instalar.js';
 
 const estado = { usuario: null, clienteProprio: null, clientes: null, servicos: null, cache: {} };
 const app = document.getElementById('app');
@@ -39,11 +40,12 @@ const MENU_CLIENTE = [
 ];
 
 // ---------- Rotas ----------
-// #/login · #/convite/TOKEN · #/ (Vie) · #/equipe · #/c/:cliente/:pagina/:extra
+// #/login · #/convite/TOKEN · #/instalar · #/ (Vie) · #/equipe · #/c/:cliente/:pagina/:extra
 function lerRota() {
   const partes = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   if (partes[0] === 'login') return { tela: 'login' };
   if (partes[0] === 'convite') return { tela: 'convite', token: partes[1] };
+  if (partes[0] === 'instalar') return { tela: 'instalar' };
   if (partes[0] === 'c' && partes[1]) return { tela: 'cliente', clienteId: partes[1], pagina: PAGINAS[partes[2]] ? partes[2] : 'painel', extra: partes[3] };
   if (partes[0] === 'equipe') return { tela: 'vie', pagina: 'equipe' };
   if (partes[0] === 'servicos') return { tela: 'vie', pagina: 'servicos' };
@@ -58,13 +60,14 @@ export function ir(caminho) {
 async function desenhar() {
   const rota = lerRota();
   if (rota.tela === 'convite') return telaConvite(rota.token);
+  if (rota.tela === 'instalar') return paginaInstalar(app);
   if (!estado.usuario) {
     try {
       const eu = await api('auth');
       estado.usuario = eu.usuario;
       estado.clienteProprio = eu.cliente;
-    } catch {
-      return telaLogin();
+    } catch (err) {
+      return err.semConexao ? telaSemInternet() : telaLogin();
     }
   }
   if (rota.tela === 'login') return ir('/');
@@ -79,6 +82,21 @@ async function desenhar() {
   }
   if (rota.tela === 'cliente') return telaCliente(rota);
   return telaVie(rota);
+}
+
+// No app instalado, abrir sem internet mostra este aviso em vez do login.
+function telaSemInternet() {
+  app.innerHTML = `
+    <div class="tela-instalar" style="background:var(--choc);color:var(--creme)">
+      <div class="caixa" style="max-width:360px">
+        <img src="/img/logo-creme.png" alt="Vie Company" style="width:150px;justify-self:center">
+        <h1 style="color:#fff">Você está sem internet</h1>
+        <p style="opacity:.8">O portal precisa de conexão para mostrar os seus cronogramas e entregas. Assim que a internet voltar, ele abre sozinho.</p>
+        <div class="acoes"><button class="btn acc" data-tentar>Tentar de novo</button></div>
+      </div>
+    </div>`;
+  app.querySelector('[data-tentar]').onclick = desenhar;
+  window.addEventListener('online', desenhar, { once: true });
 }
 
 // ---------- Login ----------
@@ -104,6 +122,7 @@ function telaLogin(mensagem = '') {
           <p class="erro-form">${esc(mensagem)}</p>
           <button class="btn acc bloco" type="submit">Entrar</button>
           <p class="muted" style="font-size:13px">Esqueceu a senha? Fale com a equipe Vie para receber um novo link de acesso.</p>
+          ${jaInstalado() ? '' : '<a class="link-instalar" href="#/instalar">Instalar o app no celular</a>'}
         </form>
       </div>
     </div>`;
@@ -161,6 +180,8 @@ async function telaConvite(token) {
       const { usuario } = await api('auth', { metodo: 'POST', corpo: { acao: 'convite-aceitar', token, ...lerCampos(form) } });
       estado.usuario = null;
       ir(usuario.role === 'admin' ? '/' : `/c/${usuario.clienteId}`);
+      // Primeiro acesso pelo celular: já sugere instalar o app.
+      if (mostrarInstalar() && /Android|iPhone|iPad|iPod/.test(navigator.userAgent)) setTimeout(abrirComoInstalar, 900);
     } catch (err) {
       form.querySelector('.erro-form').textContent = err.message;
     }
@@ -177,6 +198,7 @@ function moldura({ marcaHtml, menuHtml, titulo }) {
         ${menuHtml}
         <div class="rodape">
           <div class="usuario"><span class="avatar">${esc(iniciais(u.nome))}</span><div><div class="nome">${esc(u.nome)}</div><div class="sub">${u.role === 'admin' ? 'Equipe Vie' : 'Cliente'}</div></div></div>
+          <button class="instalar-app" data-instalar-app hidden>${icones.baixar}<span>Instalar app no celular</span></button>
           <div class="acoes"><button data-conta>Minha conta</button><button data-sair>Sair</button></div>
           ${u.role === 'admin' ? '' : '<div class="assinatura"><img src="/img/logo-creme.png" alt="Vie Company"><span>Assessoria de marketing</span></div>'}
         </div>
@@ -196,6 +218,11 @@ function moldura({ marcaHtml, menuHtml, titulo }) {
   });
   app.querySelector('[data-sair]').onclick = sair;
   app.querySelector('[data-conta]').onclick = minhaConta;
+  const instalar = app.querySelector('[data-instalar-app]');
+  const mostrar = () => { instalar.hidden = !mostrarInstalar(); };
+  instalar.onclick = abrirComoInstalar;
+  mostrar();
+  const parar = aoMudarInstalacao(() => (document.body.contains(instalar) ? mostrar() : parar()));
   return app.querySelector('#conteudo');
 }
 
@@ -360,6 +387,7 @@ function minhaConta() {
   });
 }
 
+iniciarApp();
 window.addEventListener('hashchange', desenhar);
 window.addEventListener('sessao-expirada', () => {
   estado.usuario = null;

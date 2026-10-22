@@ -12,7 +12,14 @@ export async function api(caminho, { metodo = 'GET', corpo, arquivo, tipo } = {}
     opcoes.body = JSON.stringify(corpo);
     opcoes.headers['Content-Type'] = 'application/json';
   }
-  const resposta = await fetch(`/api/${caminho}`, opcoes);
+  let resposta;
+  try {
+    resposta = await fetch(`/api/${caminho}`, opcoes);
+  } catch {
+    const erro = new Error('Sem conexão com a internet. Tente de novo quando a conexão voltar.');
+    erro.semConexao = true;
+    throw erro;
+  }
   const dados = await resposta.json().catch(() => ({}));
   if (!resposta.ok) {
     if (resposta.status === 401 && !caminho.startsWith('auth')) window.dispatchEvent(new Event('sessao-expirada'));
