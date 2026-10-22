@@ -37,7 +37,7 @@ Na Gestão de Instagram, o Cronograma tem duas partes, uma ao lado da outra no t
 - **Cronograma da Vie**: o que a equipe produz e publica.
 - **Cronograma do cliente** (para o cliente, **Seu cronograma**): o que ele grava e posta.
 
-Cada parte tem o próprio HTML (**Subir cronograma pronto** com a parte escolhida), a própria leitura dos posts e as próprias caixinhas. As caixinhas do cronograma da Vie são marcadas só pela equipe; o cliente vê o que já foi publicado. A aprovação do mês e a liberação valem para as duas partes juntas. A visão geral soma tudo e mostra em cada conteúdo quem faz: **Vie publica** ou **Você**.
+Cada parte tem o próprio HTML (**Subir cronograma pronto** com a parte escolhida), a própria leitura dos posts e as próprias caixinhas. As caixinhas do cronograma da Vie são marcadas só pela equipe; o cliente vê o que já foi publicado. A aprovação do mês e a liberação valem para as duas partes juntas. A visão geral soma tudo e mostra em cada conteúdo quem faz (**Vie publica** ou **Você**). No lugar de “Próximos conteúdos” ficam duas listas lado a lado: **Para você produzir** (o que o cliente ainda precisa gravar, com os atrasados destacados) e **A Vie vai publicar** (o que vai ao ar nos próximos dias).
 
 A divisão é a opção “Cronograma da Vie separado” em **Serviços**. Ela vem marcada na Gestão de Instagram e pode ser ligada em qualquer outro serviço.
 
@@ -58,7 +58,7 @@ Se o cronograma do mês é feito fora do portal (como os sites que vocês public
 3. O cliente vê o cronograma na área exclusiva dele e pode **aprovar o cronograma** ou **pedir ajuste** com um comentário. O pedido aparece para a Vie na visão geral e na página Aprovação.
 4. Precisa corrigir? **Substituir HTML**: o cliente passa a ver a nova versão, que volta a esperar aprovação.
 
-Assim que o HTML sobe, o portal **lê os posts de dentro do arquivo**, sem IA e sem custo nenhum. Ele entende o modelo de cronograma da Vie: cada post do feed (`<article class="post" data-k="f-DDMM">`) e cada dia de stories (`<article class="day" data-k="s-DDMM">`), com data, dia e horário, pilar, formato, título, gancho, roteiro e referências. Com isso, alimenta a visão geral, o calendário, os próximos conteúdos e o fluxo do mês. Ao substituir o HTML, o que já estava aprovado ou postado continua marcado. Também há o botão **Ler os posts de novo**.
+Assim que o HTML sobe, o portal **lê os posts de dentro do arquivo**, sem IA e sem custo nenhum. Ele entende o modelo de cronograma da Vie: cada post do feed (`<article class="post" data-k="f-DDMM">`) e cada dia de stories (`<article class="day" data-k="s-DDMM">`), com data, dia e horário, pilar, formato, título, gancho, roteiro e referências. Com isso, alimenta a visão geral, o calendário, os próximos conteúdos e o fluxo do mês. Ao substituir o HTML, o que já estava aprovado ou postado continua marcado. Quando a leitura do portal aprende um modelo novo, os HTMLs que já tinham sido enviados são lidos de novo sozinhos na próxima vez que alguém abre o mês (o que foi criado à mão no portal continua). Também há o botão **Ler os posts de novo**.
 
 O portal entende dois modelos de arquivo da Vie:
 

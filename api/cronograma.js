@@ -2,7 +2,7 @@ import {
   handler, metodo, exigirAdmin, exigirAcessoCliente, HttpError, getRedis, keys, texto, mesValido, novoId, lerCorpoBruto,
 } from '../lib/base.js';
 import { salvarArquivo, lerArquivo, apagarArquivo } from '../lib/arquivos.js';
-import { lerCronogramaHtml, SCRIPT_PONTE } from '../lib/cronograma-html.js';
+import { lerCronogramaHtml, SCRIPT_PONTE, VERSAO_LEITURA } from '../lib/cronograma-html.js';
 import { FORMATOS, STATUS, STATUS_DO_CLIENTE, gerarEsqueleto } from '../public/js/regras.js';
 
 // Cronograma mensal: cada mês é um documento com os conteúdos (feed e stories).
@@ -90,6 +90,7 @@ export default handler(async (req, res, usuario) => {
   }
 
   if (req.method === 'GET') {
+    await garantirLeitura(clienteId, doc);
     if (admin) return res.status(200).json(doc);
     if (doc.status !== 'publicado') return res.status(200).json({ mes, status: 'indisponivel', posts: [] });
     return res.status(200).json(paraCliente(doc));
@@ -254,6 +255,25 @@ export default handler(async (req, res, usuario) => {
   res.status(200).json({ ...(admin ? doc : paraCliente(doc)), salvoId });
 });
 
+// HTML enviado antes de a leitura entender o modelo dele: lê de novo e salva, uma vez só.
+export async function garantirLeitura(clienteId, doc) {
+  const pendentes = Object.entries(TRILHAS).filter(([, t]) => doc?.[t.arquivo] && doc[t.leitura]?.versao !== VERSAO_LEITURA);
+  if (!pendentes.length) return doc;
+  const redis = getRedis();
+  const editorial = await redis.get(keys.editorial(clienteId));
+  for (const [trilha, t] of pendentes) {
+    try {
+      const arquivo = await lerArquivo(doc[t.arquivo].arquivoId);
+      aplicarLeitura(doc, lerCronogramaHtml(arquivo.conteudo.toString('utf8'), doc.mes), editorial?.pilares || [], new Date().toISOString(), trilha, { manterManuais: true });
+    } catch (err) {
+      console.error('Releitura do cronograma falhou', clienteId, doc.mes, trilha, err.message);
+      return doc;
+    }
+  }
+  await redis.set(keys.cronograma(clienteId, doc.mes), doc);
+  return doc;
+}
+
 const statusDaMarca = (p) => (p.marcaHtml === 'gravado' ? 'gravado' : 'postado');
 
 function contar(posts) {
@@ -293,13 +313,14 @@ function limparPost(p, mes, trilha) {
 
 // Troca os conteúdos da trilha pelos lidos do HTML, mantendo o andamento já marcado.
 // Os conteúdos da outra trilha ficam como estão.
-function aplicarLeitura(doc, lidos, pilares, quando, trilha = 'cliente') {
+// `manterManuais`: na releitura automática, o que a equipe criou no portal continua.
+function aplicarLeitura(doc, lidos, pilares, quando, trilha = 'cliente', { manterManuais = false } = {}) {
   const anoMes = doc.mes;
   const { prefixo, leitura } = TRILHAS[trilha];
   const normal = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const pilarPorNome = new Map(pilares.map((p) => [normal(p.nome), p.id]));
-  const daTrilha = doc.posts.filter((p) => naTrilha(p, trilha));
-  const outros = doc.posts.filter((p) => !naTrilha(p, trilha));
+  const daTrilha = doc.posts.filter((p) => naTrilha(p, trilha) && !(manterManuais && p.origem !== 'html'));
+  const outros = doc.posts.filter((p) => !naTrilha(p, trilha) || (manterManuais && p.origem !== 'html'));
   const anteriores = new Map(daTrilha.map((p) => [p.chaveHtml || `${p.data}|${p.formato}`, p]));
   const aprovado = doc.aprovacaoMes?.status === 'aprovado';
   const marcas = doc.marcasHtml || {};
@@ -335,5 +356,5 @@ function aplicarLeitura(doc, lidos, pilares, quando, trilha = 'cliente') {
   doc.posts.sort((a, b) => (a.data + a.horario).localeCompare(b.data + b.horario));
   // Arquivo que passa da virada do mês: avisa quais meses precisam do mesmo arquivo.
   const outrosMeses = [...new Set(lidos.map((p) => p.data.slice(0, 7)).filter((m) => m !== anoMes))].sort();
-  doc[leitura] = { em: quando, total: doMes.length, foraDoMes: lidos.length - doMes.length, outrosMeses };
+  doc[leitura] = { em: quando, total: doMes.length, foraDoMes: lidos.length - doMes.length, outrosMeses, versao: VERSAO_LEITURA };
 }

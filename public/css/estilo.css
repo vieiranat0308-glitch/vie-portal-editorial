@@ -589,3 +589,6 @@ textarea.entrada { resize: vertical; min-height: 84px; line-height: 1.5; }
 .tela-instalar h1 { font: 400 clamp(30px, 6vw, 42px)/1.08 var(--serif); margin: 0; }
 .tela-instalar .acoes { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
 .tela-instalar .ja-instalado { font-weight: 500; color: var(--s-aprovado); }
+.item-conteudo.atrasado .data { border-color: var(--s-ajuste); color: var(--s-ajuste); }
+.listas-trilhas { align-items: start; }
+.listas-trilhas .vazio a { color: var(--acc); font-weight: 500; }

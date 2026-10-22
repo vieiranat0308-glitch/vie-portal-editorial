@@ -126,7 +126,7 @@ export async function render(el, ctx) {
               ${m?.pacientes != null ? `<div style="text-align:right"><div class="numero-grande">${num(m.pacientes)}</div><span class="mono muted" style="font-size:9.5px">Novos pacientes · ${esc(nomeDoMes(ultimo, { curto: true }))}</span></div>` : ''}
             </div>` : ''}
 
-          <div class="cartao">
+          ${separado && disponivel ? listasPorTrilha(posts, hoje, apMes) : `<div class="cartao">
             <div class="cab"><h3>Próximos conteúdos</h3><a class="btn claro peq" style="margin-left:auto" href="#${ctx.base}/cronograma/${mes}">Ver mês</a></div>
             ${!disponivel ? `<div class="vazio"><strong>Em preparação</strong>O cronograma de ${esc(nomeDoMes(mes))} está sendo finalizado pela equipe Vie.</div>`
               : temInterativo(doc) && !posts.length ? `
@@ -140,7 +140,7 @@ export async function render(el, ctx) {
                 </div>`
               : proximos.length ? `<div class="lista-conteudos">${proximos.map((p) => itemConteudo(p, hoje)).join('')}</div>`
               : `<div class="vazio">${posts.length ? 'Todos os conteúdos deste mês já passaram.' : 'Nenhum conteúdo neste mês ainda.'}</div>`}
-          </div>
+          </div>`}
         </div>
 
         <div class="coluna">
@@ -172,13 +172,51 @@ export async function render(el, ctx) {
     });
   }
 
-  function itemConteudo(p, hoje, compacto = false) {
+  // Gestão de Instagram: o que o cliente precisa produzir e o que a Vie vai publicar.
+  function listasPorTrilha(posts, hoje, apMes) {
+    const inicio = mes === mesAtual() ? hoje : `${mes}-01`;
+    const daTrilha = (t) => posts.filter((p) => (p.trilha === 'vie' ? 'vie' : 'cliente') === t);
+    // Do cliente: o que ainda não foi gravado, incluindo o que ficou para trás no mês.
+    const produzir = daTrilha('cliente').filter((p) => !['gravado', 'postado'].includes(p.status) && (p.data >= inicio || mes === mesAtual()));
+    const atrasados = produzir.filter((p) => p.data < hoje).length;
+    // Da Vie: o que vai ao ar a partir de hoje.
+    const publicar = daTrilha('vie').filter((p) => p.status !== 'postado' && p.data >= inicio);
+    const cartao = ({ titulo, sub, lista, total, html, vazio }) => `
+      <div class="cartao">
+        <div class="cab"><h3>${titulo}</h3><span class="mono" style="margin-left:auto">${sub}</span></div>
+        ${lista.length ? `<div class="lista-conteudos">${lista.slice(0, 6).map((p) => itemConteudo(p, hoje, true, true)).join('')}</div>
+          ${lista.length > 6 ? `<a class="btn claro peq bloco" style="margin-top:12px" href="#${ctx.base}/cronograma/${mes}">Ver mais ${lista.length - 6}</a>` : ''}`
+          : html && !total ? `<div class="vazio"><strong>Cronograma interativo pronto</strong>${apMes === 'aprovado' ? 'Aprovado ✓. ' : ''}<a href="#${ctx.base}/cronograma/${mes}">Abrir cronograma</a></div>`
+          : `<div class="vazio">${vazio}</div>`}
+      </div>`;
+    return `<div class="duas listas-trilhas">
+      ${cartao({
+        titulo: admin ? 'O cliente produz' : 'Para você produzir',
+        sub: produzir.length ? `${produzir.length} a gravar${atrasados ? ` · ${atrasados} ${atrasados === 1 ? 'atrasado' : 'atrasados'}` : ''}` : 'Em dia',
+        lista: produzir,
+        total: daTrilha('cliente').length,
+        html: !!doc.interativo,
+        vazio: daTrilha('cliente').length ? 'Tudo gravado por aqui. ✓' : 'Nenhum conteúdo para gravar neste mês.',
+      })}
+      ${cartao({
+        titulo: admin ? 'A Vie publica' : 'A Vie vai publicar',
+        sub: publicar.length ? `${publicar.length} até o fim do mês` : '',
+        lista: publicar,
+        total: daTrilha('vie').length,
+        html: !!doc.interativoVie,
+        vazio: daTrilha('vie').length ? 'Tudo publicado neste mês. ✓' : 'O cronograma da Vie deste mês ainda não foi colocado no portal.',
+      })}
+    </div>`;
+  }
+
+  function itemConteudo(p, hoje, compacto = false, semTrilha = false) {
+    const atrasado = p.data < hoje && p.trilha !== 'vie' && !['gravado', 'postado'].includes(p.status);
     return `
-      <button class="item-conteudo${p.data === hoje ? ' hoje' : ''}${compacto ? ' compacto' : ''}" data-post="${p.id}">
+      <button class="item-conteudo${p.data === hoje ? ' hoje' : ''}${atrasado ? ' atrasado' : ''}${compacto ? ' compacto' : ''}" data-post="${p.id}" ${atrasado ? 'title="Data já passou e ainda não foi gravado"' : ''}>
         <span class="data"><b>${Number(p.data.slice(8))}</b><small>${esc(diaSemanaCurto(p.data))}</small></span>
         <span style="min-width:0">
           <span class="titulo" style="display:block">${p.titulo ? esc(p.titulo) : '<span class="sem-titulo">Sem título</span>'}</span>
-          <span class="meta">${separado ? etiquetaTrilha(p, admin) : ''}${etiquetaFormato(p.formato)}${p.horario ? `<span>${esc(p.horario)}</span>` : ''}${pilares.find((x) => x.id === p.pilarId) ? `<span style="color:${corDoPilar(pilares, p.pilarId)}">● ${esc(pilares.find((x) => x.id === p.pilarId).nome)}</span>` : ''}</span>
+          <span class="meta">${separado && !semTrilha ? etiquetaTrilha(p, admin) : ''}${etiquetaFormato(p.formato)}${p.horario ? `<span>${esc(p.horario)}</span>` : ''}${pilares.find((x) => x.id === p.pilarId) ? `<span style="color:${corDoPilar(pilares, p.pilarId)}">● ${esc(pilares.find((x) => x.id === p.pilarId).nome)}</span>` : ''}</span>
           ${compacto ? `<span class="meta">${etiquetaStatus(p.status)}</span>` : ''}
         </span>
         ${compacto ? '' : etiquetaStatus(p.status)}

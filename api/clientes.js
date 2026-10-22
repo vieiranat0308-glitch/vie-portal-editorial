@@ -1,7 +1,7 @@
 import {
   handler, metodo, exigirAdmin, exigirAcessoCliente, HttpError, getRedis, keys, slugify, texto, novoId,
 } from '../lib/base.js';
-import { temInterativo } from './cronograma.js';
+import { temInterativo, garantirLeitura } from './cronograma.js';
 import { exemploCliente, exemploEditorial, exemploIdeias, exemploMetricas, exemploEvolucao } from '../lib/exemplo.js';
 
 export default handler(async (req, res, usuario) => {
@@ -100,7 +100,8 @@ function limpar(c) {
 
 async function resumo(clienteId, mes) {
   const redis = getRedis();
-  const [doc, metricas] = await Promise.all([redis.get(keys.cronograma(clienteId, mes)), redis.get(keys.metricas(clienteId))]);
+  const [salvo, metricas] = await Promise.all([redis.get(keys.cronograma(clienteId, mes)), redis.get(keys.metricas(clienteId))]);
+  const doc = salvo && await garantirLeitura(clienteId, salvo);
   const posts = doc?.posts || [];
   const vie = posts.filter((p) => p.trilha === 'vie').length;
   const porStatus = {};
