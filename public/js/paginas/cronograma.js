@@ -25,10 +25,10 @@ export async function render(el, ctx) {
   const daTrilha = (p) => !separado || (p.trilha === 'vie' ? 'vie' : 'cliente') === trilha;
   const arquivoDaTrilha = () => (trilha === 'vie' ? doc.interativoVie : doc.interativo);
   const leituraDaTrilha = () => (trilha === 'vie' ? doc.leituraHtmlVie : doc.leituraHtml);
-  const planilhaDaTrilha = () => (trilha === 'vie' ? doc.planilhaVie : doc.planilha);
-  // O conteúdo que a Vie produz vem da planilha do Drive (com os links das artes).
-  const usaPlanilha = () => admin && separado && trilha === 'vie';
-  const visaoInicial = () => (arquivoDaTrilha() ? 'interativo' : planilhaDaTrilha()?.total ? 'lista' : visaoSalva);
+  const driveDaTrilha = () => (trilha === 'vie' ? doc.driveVie : doc.drive);
+  // O conteúdo pronto que a Vie produz vem direto das pastas do Google Drive.
+  const usaDrive = () => admin && separado && trilha === 'vie';
+  const visaoInicial = () => (arquivoDaTrilha() ? 'interativo' : driveDaTrilha()?.total ? 'lista' : visaoSalva);
 
   const acoes = ctx.topo('Geral', 'Cronograma', `
     <div class="seletor-mes">
@@ -84,7 +84,7 @@ export async function render(el, ctx) {
       ${admin && doc.status !== 'publicado' ? `
         <div class="aviso-rascunho">
           <span><b>Rascunho.</b> ${esc(cliente.nome)} ainda não vê este mês. ${html || posts.length ? 'Revise e libere quando estiver pronto.' : `Suba ${separado ? `o ${nomeNaFrase(trilha)}` : 'o cronograma'} pronto ou monte os conteúdos aqui no portal.`}</span>
-          ${!posts.length && !html ? `${usaPlanilha() ? `<button class="btn claro peq" data-planilha>${icones.link}Ligar planilha do Drive</button>` : ''}<button class="btn claro peq" data-subir>${icones.baixar}Subir cronograma pronto (HTML)</button><button class="btn fantasma peq" data-esqueleto>Montar pela linha editorial</button>` : ''}
+          ${!posts.length && !html ? `${usaDrive() ? `<button class="btn claro peq" data-drive>${icones.link}Ligar pasta do Drive</button>` : ''}<button class="btn claro peq" data-subir>${icones.baixar}Subir cronograma pronto (HTML)</button><button class="btn fantasma peq" data-esqueleto>Montar pela linha editorial</button>` : ''}
           <button class="btn acc peq" data-publicar ${algumConteudo ? '' : 'disabled'}>Liberar para o cliente</button>
         </div>` : ''}
       ${faixaAprovacaoMes({ ctx, doc, mes, linkCronograma: false })}
@@ -95,7 +95,7 @@ export async function render(el, ctx) {
           ${doc.observacoes ? `<p class="obs">${esc(doc.observacoes)}</p>` : ''}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-          ${usaPlanilha() && (posts.length || html || doc.status === 'publicado') ? `<button class="btn claro peq" data-planilha>${icones.link}${planilhaDaTrilha() ? 'Planilha do Drive' : 'Ligar planilha do Drive'}</button>` : ''}
+          ${usaDrive() && (posts.length || html || doc.status === 'publicado') && !driveDaTrilha() ? `<button class="btn claro peq" data-drive>${icones.link}Ligar pasta do Drive</button>` : ''}
           ${admin && (html || posts.length || doc.status === 'publicado') ? `<button class="btn claro peq" data-subir>${icones.baixar}${html ? 'Substituir HTML' : 'Subir cronograma pronto (HTML)'}</button>` : ''}
           ${admin ? `<button class="btn claro peq" data-foco>${icones.editar}Foco e recados</button>` : ''}
           ${admin && (posts.length || (doc.status === 'publicado' && !html)) ? `<button class="btn claro peq" data-esqueleto>${posts.length ? 'Completar' : 'Montar'} pela linha editorial</button>` : ''}
@@ -104,7 +104,7 @@ export async function render(el, ctx) {
         </div>
       </div>
 
-      ${cartaoPlanilha()}
+      ${cartaoDrive()}
 
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
         ${abas.length > 1 ? `<div class="abas" role="tablist">
@@ -181,15 +181,16 @@ export async function render(el, ctx) {
       };
     });
     el.querySelectorAll('[data-subir]').forEach((b) => { b.onclick = subirHtml; });
-    el.querySelectorAll('[data-planilha]').forEach((b) => { b.onclick = ligarPlanilha; });
-    el.querySelector('[data-planilha-atualizar]')?.addEventListener('click', async (e) => {
+    el.querySelectorAll('[data-drive]').forEach((b) => { b.onclick = ligarDrive; });
+    el.querySelector('[data-drive-atualizar]')?.addEventListener('click', async (e) => {
       e.target.disabled = true;
-      await enviarAcao({ acao: 'planilha-atualizar', trilha });
-      avisarPlanilha();
+      e.target.textContent = 'Lendo o Drive…';
+      await enviarAcao({ acao: 'drive-atualizar', trilha });
+      avisarDrive();
     });
-    el.querySelector('[data-planilha-remover]')?.addEventListener('click', async () => {
-      if (!(await confirmar('O portal deixa de ler esta planilha. Os conteúdos e as aprovações que já estão aqui continuam.', { botao: 'Desligar planilha' }))) return;
-      enviarAcao({ acao: 'planilha-remover', trilha });
+    el.querySelector('[data-drive-remover]')?.addEventListener('click', async () => {
+      if (!(await confirmar('O portal deixa de ler esta pasta. Os conteúdos e as aprovações que já estão aqui continuam.', { botao: 'Desligar pasta' }))) return;
+      enviarAcao({ acao: 'drive-remover', trilha });
     });
     el.querySelector('[data-remover-html]')?.addEventListener('click', async () => {
       if (!(await confirmar('O arquivo do cronograma interativo será removido deste mês.', { botao: 'Remover', perigo: true }))) return;
@@ -298,65 +299,57 @@ export async function render(el, ctx) {
     };
   }
 
-  function cartaoPlanilha() {
-    const pl = planilhaDaTrilha();
-    if (!pl || (!admin && !pl.pasta)) return '';
-    const outros = pl.outrosMeses?.length ? ` <b>${pl.foraDoMes} ${pl.foraDoMes === 1 ? 'conteúdo é' : 'conteúdos são'} de ${pl.outrosMeses.map((m) => nomeDoMes(m).toLowerCase().replace(' ', ' de ')).join(' e ')}:</b> ligue a mesma planilha também ${pl.outrosMeses.length === 1 ? 'nesse mês' : 'nesses meses'}.` : '';
+  function cartaoDrive() {
+    const d = driveDaTrilha();
+    if (!d) return '';
+    const meses = (d.outrosMeses || []).map((m) => nomeDoMes(m).toLowerCase().replace(' ', ' de ')).join(' e ');
+    const outros = admin && d.outrosMeses?.length ? ` <b>${d.foraDoMes} ${d.foraDoMes === 1 ? 'conteúdo é' : 'conteúdos são'} de ${meses}:</b> ligue a mesma pasta também ${d.outrosMeses.length === 1 ? 'nesse mês' : 'nesses meses'}.` : '';
     return `
-      <div class="cartao cartao-planilha">
+      <div class="cartao cartao-drive">
         <div style="flex:1;min-width:220px">
-          <span class="mono">${admin ? 'Planilha do Drive' : 'Conteúdo no Drive'}</span>
+          <span class="mono">Conteúdo pronto no Drive</span>
           <p class="muted" style="font-size:13.5px;margin-top:4px">${admin
-            ? `${pl.lidaEm ? `${esc(pl.nome || 'Planilha')} · ${pl.total} ${pl.total === 1 ? 'conteúdo lido' : 'conteúdos lidos'} em ${esc(quando(pl.lidaEm))}. ` : ''}${pl.link ? 'Mudou algo na planilha? Clique em “Atualizar da planilha”: o que já foi aprovado continua aprovado.' : pl.lidaEm ? 'Enviada como arquivo: para atualizar, envie a versão nova.' : ''}${outros}`
-            : 'As artes e vídeos deste mês também estão na pasta do Drive.'}</p>
+            ? `${d.total} ${d.total === 1 ? 'conteúdo' : 'conteúdos'} lidos das pastas em ${esc(quando(d.lidaEm))}. Subiu ou trocou arte no Drive? Clique em “Atualizar do Drive” (o portal também confere sozinho a cada 10 minutos). O que já foi aprovado continua, e arte trocada volta para aprovação.${outros}${d.erro ? ` <b style="color:var(--s-ajuste)">Última conferência: ${esc(d.erro)}</b>` : ''}`
+            : 'Cada conteúdo abaixo mostra a arte ou o vídeo pronto. Abra para aprovar ou pedir ajuste.'}</p>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          ${admin && pl.link ? '<button class="btn acc peq" data-planilha-atualizar>Atualizar da planilha</button>' : ''}
-          ${admin && pl.link ? `<a class="btn claro peq" href="${esc(pl.link)}" target="_blank" rel="noopener">${icones.link}Abrir planilha</a>` : ''}
-          ${pl.pasta ? `<a class="btn claro peq" href="${esc(pl.pasta)}" target="_blank" rel="noopener">${icones.link}Abrir pasta no Drive</a>` : ''}
-          ${admin ? `<button class="btn-icone" data-planilha-remover title="Desligar planilha">${icones.lixo}</button>` : ''}
+          ${admin ? '<button class="btn acc peq" data-drive-atualizar>Atualizar do Drive</button>' : ''}
+          <a class="btn claro peq" href="${esc(d.pasta)}" target="_blank" rel="noopener">${icones.link}Abrir pasta no Drive</a>
+          ${admin ? `<button class="btn-icone" data-drive-remover title="Desligar pasta">${icones.lixo}</button>` : ''}
         </div>
       </div>`;
   }
 
-  function avisarPlanilha() {
-    const pl = planilhaDaTrilha();
-    if (!pl?.lidaEm) return;
-    aviso(`${pl.total} ${pl.total === 1 ? 'conteúdo lido' : 'conteúdos lidos'} da planilha. ${doc.status === 'publicado' ? 'Os novos já estão com o cliente para aprovar.' : 'Libere o mês para o cliente aprovar.'}`);
-    if (pl.outrosMeses?.length) aviso(`${pl.foraDoMes} ${pl.foraDoMes === 1 ? 'conteúdo é' : 'conteúdos são'} de ${pl.outrosMeses.map((m) => nomeDoMes(m).toLowerCase().replace(' ', ' de ')).join(' e ')}: ligue a mesma planilha também ${pl.outrosMeses.length === 1 ? 'nesse mês' : 'nesses meses'}.`);
+  function avisarDrive() {
+    const d = driveDaTrilha();
+    if (!d?.lidaEm) return;
+    aviso(`${d.total} ${d.total === 1 ? 'conteúdo lido' : 'conteúdos lidos'} do Drive. ${doc.status === 'publicado' ? 'Os novos já estão com o cliente para aprovar.' : 'Libere o mês para o cliente aprovar.'}`);
+    if (d.outrosMeses?.length) aviso(`${d.foraDoMes} ${d.foraDoMes === 1 ? 'conteúdo é' : 'conteúdos são'} de ${d.outrosMeses.map((m) => nomeDoMes(m).toLowerCase().replace(' ', ' de ')).join(' e ')}: ligue a mesma pasta também ${d.outrosMeses.length === 1 ? 'nesse mês' : 'nesses meses'}.`);
   }
 
-  function ligarPlanilha() {
-    const pl = planilhaDaTrilha() || {};
+  function ligarDrive() {
     const m = abrirCamada(`
-      <h2>Planilha do Drive<small class="muted" style="display:block;font-size:14px;margin-top:4px">${nomeTrilha[trilha]} · ${esc(nomeDoMes(mes))}</small></h2>
-      <p class="muted">O portal lê a planilha do cronograma e cria um conteúdo por linha, com a arte ou o vídeo do link da coluna <b>Imagem</b>. ${esc(cliente.nome)} aprova ou pede ajuste em cada um.</p>
-      <label class="campo"><span>Link da planilha (Google Planilhas ou .xlsx no Drive)</span><input class="entrada" name="link" placeholder="https://docs.google.com/spreadsheets/d/…" value="${esc(pl.link || '')}"></label>
-      <label class="campo"><span>Link da pasta do mês no Drive (opcional, vira o botão “Abrir pasta no Drive”)</span><input class="entrada" name="pasta" placeholder="https://drive.google.com/drive/folders/…" value="${esc(pl.pasta || '')}"></label>
-      <p class="muted" style="font-size:13px">A planilha e as artes precisam estar compartilhadas como <b>“Qualquer pessoa com o link”</b> (Leitor). Prefere enviar o arquivo? <label class="link-arquivo">Escolher .xlsx, .csv ou .html<input type="file" accept=".xlsx,.csv,.html,.htm" hidden></label> <span data-arquivo-nome></span></p>
-      <div class="rodape-modal"><button class="btn claro" data-fechar>Cancelar</button><button class="btn acc" data-ok>Ler planilha</button></div>`);
-    const campoArquivo = m.el.querySelector('input[type=file]');
-    campoArquivo.onchange = () => { m.el.querySelector('[data-arquivo-nome]').textContent = campoArquivo.files[0]?.name || ''; };
+      <h2>Pasta do Drive<small class="muted" style="display:block;font-size:14px;margin-top:4px">${nomeTrilha[trilha]} · ${esc(nomeDoMes(mes))}</small></h2>
+      <p class="muted">Cole o link da pasta do mês com o conteúdo pronto. O portal entra nas subpastas de cada data (ex.: <b>22.10</b>) e monta os conteúdos: vídeo vira reels, imagens viram carrossel (ou post único) e o que tiver <b>story</b> no nome ou na pasta vira stories. Um Google Doc ou .txt na pasta do dia vira a legenda.</p>
+      <label class="campo"><span>Link da pasta do mês</span><input class="entrada" name="pasta" placeholder="https://drive.google.com/drive/folders/…" value="${esc(driveDaTrilha()?.pasta || '')}"></label>
+      <p class="muted" style="font-size:13px">A pasta precisa estar compartilhada como <b>“Qualquer pessoa com o link”</b> (Leitor). ${esc(cliente.nome)} aprova ou pede ajuste em cada conteúdo.</p>
+      <div class="rodape-modal"><button class="btn claro" data-fechar>Cancelar</button><button class="btn acc" data-ok>Ler pasta</button></div>`);
     m.el.querySelector('[data-ok]').onclick = async (ev) => {
-      const link = m.el.querySelector('[name=link]').value.trim();
       const pasta = m.el.querySelector('[name=pasta]').value.trim();
-      const arquivo = campoArquivo.files[0];
-      if (!link && !arquivo && !pasta) return aviso('Cole o link da planilha ou escolha o arquivo.', { erro: true });
+      if (!pasta) return aviso('Cole o link da pasta do Drive.', { erro: true });
       ev.target.disabled = true;
-      ev.target.textContent = 'Lendo…';
+      ev.target.textContent = 'Lendo as pastas…';
       try {
-        // A pasta (e o link) ficam salvos antes, para o envio do arquivo usar a mesma pasta.
-        if (link || pasta) atualizar(await api(`cronograma?cliente=${id}&mes=${mes}`, { metodo: 'POST', corpo: { acao: 'planilha-link', link: arquivo ? '' : link, pasta, trilha } }));
-        if (arquivo) atualizar(await api(`cronograma?cliente=${id}&mes=${mes}&planilha=1&trilha=${trilha}&nome=${encodeURIComponent(arquivo.name)}`, { metodo: 'POST', arquivo }));
+        atualizar(await api(`cronograma?cliente=${id}&mes=${mes}`, { metodo: 'POST', corpo: { acao: 'drive-ligar', pasta, trilha } }));
         m.fechar();
         visao = visaoInicial();
         desenhar();
-        avisarPlanilha();
+        avisarDrive();
         ctx.atualizarContadores();
       } catch (err) {
         falhou(err);
         ev.target.disabled = false;
-        ev.target.textContent = 'Ler planilha';
+        ev.target.textContent = 'Ler pasta';
       }
     };
   }

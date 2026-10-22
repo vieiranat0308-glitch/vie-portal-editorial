@@ -602,9 +602,11 @@ textarea.entrada { resize: vertical; min-height: 84px; line-height: 1.5; }
 .galeria-drive figcaption { font-size: 12.5px; text-align: center; }
 .galeria-drive figcaption a { color: var(--muted); }
 .miniatura-drive { width: 64px; height: 80px; border-radius: 10px; background: var(--surface) center / cover no-repeat; flex: none; }
-.cartao-planilha { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
-.cartao-planilha .mono { color: var(--acc); font-size: 10.5px; }
+.cartao-drive { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+.cartao-drive .mono { color: var(--acc); font-size: 10.5px; }
 .link-arquivo { color: var(--acc); font-weight: 500; text-decoration: underline; cursor: pointer; }
 .bloco-feed.com-arte { background-size: cover; background-position: center; }
 .bloco-feed.com-arte .capa { visibility: hidden; }
 .bloco-feed.com-arte .rodape-bloco { background: rgba(20, 12, 10, .55); margin: 0 -12px -12px; padding: 6px 12px; }
+.galeria-drive img { width: 100%; aspect-ratio: 4 / 5; object-fit: contain; border-radius: 14px; background: var(--surface); display: block; }
+.galeria-drive.vertical img { aspect-ratio: 9 / 16; }

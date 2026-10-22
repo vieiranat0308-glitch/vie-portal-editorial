@@ -23,7 +23,7 @@ export function etiquetaTrilha(p, admin) {
     : `<span class="etq trilha-cliente">${admin ? 'Cliente' : 'Você'}</span>`;
 }
 
-// Artes e vídeos que estão no Drive (links da planilha). Abrem direto do Google:
+// Artes e vídeos prontos que estão nas pastas do Drive. Abrem direto do Google:
 // os arquivos precisam estar compartilhados como "Qualquer pessoa com o link".
 export const capaDrive = (id, largura = 600) => `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${largura}`;
 const linkDrive = (id) => `https://drive.google.com/file/d/${encodeURIComponent(id)}/view`;
@@ -37,7 +37,9 @@ function galeriaDrive(p) {
       <div class="galeria-drive${vertical ? ' vertical' : ''}">
         ${p.midia.map((m, i) => `
           <figure>
-            <iframe src="https://drive.google.com/file/d/${encodeURIComponent(m.id)}/preview" loading="lazy" allow="autoplay; fullscreen" allowfullscreen title="Arquivo ${i + 1}"></iframe>
+            ${m.tipo === 'video'
+              ? `<iframe src="https://drive.google.com/file/d/${encodeURIComponent(m.id)}/preview" loading="lazy" allow="autoplay; fullscreen" allowfullscreen title="Vídeo ${i + 1}"></iframe>`
+              : `<a href="${linkDrive(m.id)}" target="_blank" rel="noopener"><img src="${capaDrive(m.id, 1600)}" loading="lazy" alt="${esc(m.nome || `Arte ${i + 1}`)}"></a>`}
             ${p.midia.length > 1 ? `<figcaption><a href="${linkDrive(m.id)}" target="_blank" rel="noopener">${i + 1} de ${p.midia.length} · abrir</a></figcaption>` : ''}
           </figure>`).join('')}
       </div>

@@ -41,16 +41,18 @@ Cada parte tem o próprio HTML (**Subir cronograma pronto** com a parte escolhid
 
 A divisão é a opção “Cronograma da Vie separado” em **Serviços**. Ela vem marcada na Gestão de Instagram e pode ser ligada em qualquer outro serviço.
 
-### Conteúdo que a Vie produz: planilha do Drive
+### Conteúdo que a Vie produz: direto das pastas do Drive
 
-No **Cronograma da Vie**, o botão **Planilha do Drive** liga a planilha do cronograma do mês (Google Planilhas ou .xlsx no Drive). Também dá para enviar o arquivo (.xlsx, .csv ou o .html exportado do Google Planilhas). Não precisa de chave nem de conta paga.
+No **Cronograma da Vie**, o botão **Ligar pasta do Drive** recebe o link da pasta do mês com o conteúdo pronto. Não usa planilha, não precisa de chave nem de conta paga.
 
-- O portal reconhece as colunas pelo cabeçalho: a data (coluna antes de **Formato**; vale para as linhas seguintes até a próxima data), **Formato** (Story, Feed, Feed (carrossel), Reels), **Conteúdo** (“Pilar: … | tema”), **Copy para arte**, **Imagem** (links do Drive das artes e vídeos), **Legenda** e **OBS** (vira nota interna, o cliente não vê).
-- Cada linha vira um conteúdo; stories seguidos do mesmo dia viram um só. A arte ou o vídeo do link aparece dentro do conteúdo, e a capa entra na prévia do feed.
-- Com o mês liberado, os conteúdos ficam **Para aprovar**: o cliente aprova ou pede ajuste em cada um (na visão geral, na Aprovação e no Cronograma).
-- **Atualizar da planilha** lê de novo: o que já foi aprovado ou comentado continua.
-- O link da **pasta do mês** vira o botão “Abrir pasta no Drive”, também para o cliente.
-- A planilha e as artes precisam estar compartilhadas como **“Qualquer pessoa com o link”** (Leitor). Planilha que passa da virada do mês: ligue a mesma também no outro mês.
+- O portal entra nas subpastas de cada data (`22.10`, `22/10`, `22-10 Mesoterapia`…) e monta os conteúdos: **vídeo vira reels**, **imagens da mesma pasta viram carrossel** (uma só vira post), e o que tiver **story** no nome ou na pasta (ex.: `Stories/15.10`) vira stories. Subpastas chamadas Reels, Carrossel, Feed ou Stories também definem o formato.
+- As imagens seguem a ordem do nome (1, 2, 3… 10). Uma imagem dentro de uma pasta de Reels vira a capa do vídeo.
+- Um **Google Doc** ou **.txt** na pasta do dia vira a legenda (vai para o conteúdo citado no nome, ex.: “Legenda carrossel”).
+- O nome da pasta, sem a data, vira o título (ex.: `22.10 Mesoterapia` → “Mesoterapia”).
+- Com o mês liberado, os conteúdos ficam **Para aprovar**: o cliente vê a arte ou o vídeo e aprova ou pede ajuste em cada um.
+- **Atualizar do Drive** (e uma conferência automática a cada 10 minutos, quando alguém abre o mês) traz o que entrou na pasta. O que foi aprovado continua; **arte trocada volta para aprovação**.
+- A pasta precisa estar compartilhada como **“Qualquer pessoa com o link”** (Leitor). Pasta com datas do mês seguinte: ligue a mesma pasta também no outro mês.
+- Opcional: a variável `GOOGLE_API_KEY` (chave gratuita do Google Cloud com a Drive API ativada) faz a leitura pela API oficial do Google. Sem ela, o portal lê a página pública da pasta.
 
 ### Linha editorial em PDF
 
