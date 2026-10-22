@@ -41,6 +41,17 @@ Cada parte tem o próprio HTML (**Subir cronograma pronto** com a parte escolhid
 
 A divisão é a opção “Cronograma da Vie separado” em **Serviços**. Ela vem marcada na Gestão de Instagram e pode ser ligada em qualquer outro serviço.
 
+### Conteúdo que a Vie produz: planilha do Drive
+
+No **Cronograma da Vie**, o botão **Planilha do Drive** liga a planilha do cronograma do mês (Google Planilhas ou .xlsx no Drive). Também dá para enviar o arquivo (.xlsx, .csv ou o .html exportado do Google Planilhas). Não precisa de chave nem de conta paga.
+
+- O portal reconhece as colunas pelo cabeçalho: a data (coluna antes de **Formato**; vale para as linhas seguintes até a próxima data), **Formato** (Story, Feed, Feed (carrossel), Reels), **Conteúdo** (“Pilar: … | tema”), **Copy para arte**, **Imagem** (links do Drive das artes e vídeos), **Legenda** e **OBS** (vira nota interna, o cliente não vê).
+- Cada linha vira um conteúdo; stories seguidos do mesmo dia viram um só. A arte ou o vídeo do link aparece dentro do conteúdo, e a capa entra na prévia do feed.
+- Com o mês liberado, os conteúdos ficam **Para aprovar**: o cliente aprova ou pede ajuste em cada um (na visão geral, na Aprovação e no Cronograma).
+- **Atualizar da planilha** lê de novo: o que já foi aprovado ou comentado continua.
+- O link da **pasta do mês** vira o botão “Abrir pasta no Drive”, também para o cliente.
+- A planilha e as artes precisam estar compartilhadas como **“Qualquer pessoa com o link”** (Leitor). Planilha que passa da virada do mês: ligue a mesma também no outro mês.
+
 ### Linha editorial em PDF
 
 A estratégia que já está pronta em PDF (feita no Canva, por exemplo) pode ser enviada direto: abra o cliente → **Linha editorial** → **Subir PDF pronto**. O cliente vê todas as páginas dentro do portal (também no celular), com **Abrir em tela cheia** e **Baixar**. Para trocar, use **Substituir PDF**.

@@ -1,7 +1,7 @@
 // Aprovação: o que está esperando o cliente e o que o cliente pediu para ajustar.
 import { api, esc, falhou, dataLonga, quando } from '../ui.js';
 import { corDoPilar, nomeDoMes } from '../regras.js';
-import { abrirPost, etiquetaFormato, etiquetaPilar, etiquetaStatus } from '../componentes/post.js';
+import { abrirPost, etiquetaFormato, etiquetaPilar, etiquetaStatus, capaDrive } from '../componentes/post.js';
 
 export async function render(el, ctx) {
   const { cliente, admin } = ctx;
@@ -31,7 +31,10 @@ export async function render(el, ctx) {
           ${admin && !p.publicado ? '<span class="etq">Mês em rascunho</span>' : ''}
           <span style="margin-left:auto">${etiquetaStatus(p.status)}</span>
         </div>
-        <h3 class="serif" style="font-size:22px">${p.titulo ? esc(p.titulo) : '<span class="sem-titulo">Sem título</span>'}</h3>
+        <div style="display:flex;gap:14px;align-items:flex-start">
+          ${p.midia?.length ? `<span class="miniatura-drive" style="background-image:url('${capaDrive(p.midia[0].id, 300)}')"></span>` : ''}
+          <h3 class="serif" style="font-size:22px;flex:1">${p.titulo ? esc(p.titulo) : '<span class="sem-titulo">Sem título</span>'}</h3>
+        </div>
         ${p.gancho ? `<p class="citacao" style="font:400 16px/1.5 var(--sans);border-left:3px solid var(--acc);padding-left:14px">“${esc(p.gancho)}”</p>` : ''}
         ${ultimo ? `<div class="comentario${ultimo.admin ? ' vie' : ''}"><div class="quem"><b>${esc(ultimo.nome)}</b><span style="margin-left:auto">${esc(quando(ultimo.em))}</span></div><p>${esc(ultimo.texto)}</p></div>` : ''}
         <div><button class="btn ${p.status === 'aprovacao' && !admin ? 'acc' : 'claro'} peq" data-abrir="${p.mes}|${p.id}">${p.status === 'aprovacao' && !admin ? 'Ver e aprovar' : 'Abrir conteúdo'}</button></div>

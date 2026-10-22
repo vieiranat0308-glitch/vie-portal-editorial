@@ -3,6 +3,7 @@ import {
 } from '../lib/base.js';
 import { salvarArquivo, lerArquivo, apagarArquivo } from '../lib/arquivos.js';
 import { lerCronogramaHtml, SCRIPT_PONTE, VERSAO_LEITURA } from '../lib/cronograma-html.js';
+import { lerPlanilha, enderecoDeDownload } from '../lib/cronograma-planilha.js';
 import { FORMATOS, STATUS, STATUS_DO_CLIENTE, gerarEsqueleto } from '../public/js/regras.js';
 
 // Cronograma mensal: cada mês é um documento com os conteúdos (feed e stories).
@@ -13,8 +14,8 @@ import { FORMATOS, STATUS, STATUS_DO_CLIENTE, gerarEsqueleto } from '../public/j
 // equipe produz e publica) e o do cliente (o que ele grava e posta). Cada uma
 // pode ter o próprio HTML; os posts guardam a trilha em `trilha`.
 export const TRILHAS = {
-  cliente: { arquivo: 'interativo', leitura: 'leituraHtml', prefixo: '' },
-  vie: { arquivo: 'interativoVie', leitura: 'leituraHtmlVie', prefixo: 'vie:' },
+  cliente: { arquivo: 'interativo', leitura: 'leituraHtml', prefixo: '', planilha: 'planilha' },
+  vie: { arquivo: 'interativoVie', leitura: 'leituraHtmlVie', prefixo: 'vie:', planilha: 'planilhaVie' },
 };
 const trilhaDe = (v) => (v === 'vie' ? 'vie' : 'cliente');
 const naTrilha = (p, trilha) => (p.trilha === 'vie' ? 'vie' : 'cliente') === trilha;
@@ -47,7 +48,7 @@ export default handler(async (req, res, usuario) => {
   const chave = keys.cronograma(clienteId, mes);
   const doc = (await redis.get(chave)) || { mes, status: 'rascunho', foco: '', observacoes: '', posts: [] };
   const trilha = trilhaDe(req.query.trilha || (req.query.interativo ? '' : req.body?.trilha));
-  const { arquivo: campoArquivo, leitura: campoLeitura } = TRILHAS[trilha];
+  const { arquivo: campoArquivo, leitura: campoLeitura, planilha: campoPlanilha } = TRILHAS[trilha];
 
   if (req.method === 'GET' && req.query.interativo) {
     if (!admin && doc.status !== 'publicado') throw new HttpError(403, 'Este cronograma ainda não foi liberado.');
@@ -89,6 +90,20 @@ export default handler(async (req, res, usuario) => {
     return res.status(200).json(doc);
   }
 
+  // Planilha do cronograma enviada como arquivo (.xlsx, .csv ou .html exportado).
+  if (req.method === 'POST' && req.query.planilha) {
+    exigirAdmin(usuario);
+    const conteudo = await lerCorpoBruto(req);
+    if (!conteudo.length) throw new HttpError(400, 'Arquivo vazio.');
+    if (conteudo.length > 4 * 1024 * 1024) throw new HttpError(413, 'Planilha acima de 4 MB.');
+    const nome = texto(req.query.nome || 'planilha', 150);
+    await aplicarPlanilhaDoArquivo(doc, conteudo, { nome, link: '', pasta: doc[campoPlanilha]?.pasta || '' }, clienteId, trilha);
+    doc.atualizadoEm = doc[campoPlanilha].lidaEm;
+    await redis.set(chave, doc);
+    await redis.sadd(keys.meses(clienteId), mes);
+    return res.status(200).json(doc);
+  }
+
   if (req.method === 'GET') {
     await garantirLeitura(clienteId, doc);
     if (admin) return res.status(200).json(doc);
@@ -109,7 +124,8 @@ export default handler(async (req, res, usuario) => {
       doc.observacoes = texto(corpo.observacoes, 5000);
       if (doc.status === 'publicado' && !doc.publicadoEm) doc.publicadoEm = assinatura.em;
       if (doc.status === 'publicado' && corpo.pedirAprovacao) {
-        doc.posts.forEach((p) => { if (p.status === 'pauta') p.status = 'aprovacao'; });
+        // Num HTML a aprovação é do mês inteiro; os demais conteúdos vão para aprovação um a um.
+        doc.posts.forEach((p) => { if (p.status === 'pauta' && p.origem !== 'html') p.status = 'aprovacao'; });
       }
       break;
 
@@ -121,7 +137,7 @@ export default handler(async (req, res, usuario) => {
       if (i >= 0) {
         const anterior = doc.posts[i];
         // Editar um conteúdo lido do HTML mantém a ligação com a caixinha dele.
-        const doHtml = Object.fromEntries(['chaveHtml', 'marcaHtml', 'origem'].filter((k) => anterior[k]).map((k) => [k, anterior[k]]));
+        const doHtml = Object.fromEntries(['chaveHtml', 'marcaHtml', 'chavePlanilha', 'midia', 'origem'].filter((k) => anterior[k]).map((k) => [k, anterior[k]]));
         doc.posts[i] = { ...limpo, ...doHtml, comentarios: anterior.comentarios || [], statusPor: anterior.status === limpo.status ? anterior.statusPor : undefined };
       }
       else doc.posts.push({ ...limpo, comentarios: [] });
@@ -159,6 +175,30 @@ export default handler(async (req, res, usuario) => {
       }
       break;
     }
+
+    // Planilha do cronograma por link (Google Planilhas ou .xlsx no Drive) e pasta do Drive.
+    case 'planilha-link':
+    case 'planilha-atualizar': {
+      exigirAdmin(usuario);
+      const atual = doc[campoPlanilha] || {};
+      const link = corpo.acao === 'planilha-link' ? texto(corpo.link, 500).trim() : atual.link;
+      const pasta = corpo.acao === 'planilha-link' ? limparLinkDrive(corpo.pasta) : atual.pasta || '';
+      if (!link && corpo.acao === 'planilha-atualizar') throw new HttpError(400, 'Esta planilha foi enviada como arquivo. Envie a versão nova pelo botão “Planilha”.');
+      if (!link) {
+        // Só a pasta do Drive, sem planilha por link.
+        doc[campoPlanilha] = { ...atual, pasta };
+        break;
+      }
+      const conteudo = await baixarPlanilha(link);
+      await aplicarPlanilhaDoArquivo(doc, conteudo, { nome: atual.link === link ? atual.nome || 'Planilha do Google' : 'Planilha do Google', link, pasta }, clienteId, trilha);
+      break;
+    }
+
+    case 'planilha-remover':
+      exigirAdmin(usuario);
+      // Os conteúdos (e as aprovações) continuam; só deixa de ler a planilha.
+      delete doc[campoPlanilha];
+      break;
 
     case 'remover-interativo':
       exigirAdmin(usuario);
@@ -274,6 +314,80 @@ export async function garantirLeitura(clienteId, doc) {
   return doc;
 }
 
+function limparLinkDrive(link) {
+  const url = texto(link, 500).trim();
+  if (!url) return '';
+  if (!/^https:\/\/(drive|docs)\.google\.com\//.test(url)) throw new HttpError(400, 'O link da pasta precisa ser do Google Drive.');
+  return url;
+}
+
+async function baixarPlanilha(link) {
+  const url = enderecoDeDownload(link);
+  if (!url) throw new HttpError(400, 'Cole o link de uma planilha do Google ou de um arquivo .xlsx que está no Drive.');
+  let resposta;
+  try {
+    resposta = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(20000) });
+  } catch {
+    throw new HttpError(502, 'Não consegui falar com o Google agora. Tente de novo em instantes.');
+  }
+  const conteudo = Buffer.from(await resposta.arrayBuffer());
+  // Planilha fechada: o Google devolve uma página de login em vez do arquivo.
+  if (!resposta.ok || conteudo[0] !== 0x50 || conteudo[1] !== 0x4b) {
+    throw new HttpError(400, 'Não consegui abrir a planilha. No Google, clique em Compartilhar → Acesso geral → “Qualquer pessoa com o link” (Leitor) e tente de novo.');
+  }
+  if (conteudo.length > 10 * 1024 * 1024) throw new HttpError(413, 'Planilha acima de 10 MB.');
+  return conteudo;
+}
+
+async function aplicarPlanilhaDoArquivo(doc, conteudo, meta, clienteId, trilha) {
+  const editorial = await getRedis().get(keys.editorial(clienteId));
+  let lidos;
+  try {
+    lidos = lerPlanilha(conteudo, doc.mes, editorial?.pilares || []);
+  } catch (err) {
+    throw new HttpError(400, `Não consegui ler a planilha: ${err.message}`);
+  }
+  if (!lidos.length) throw new HttpError(400, 'Não encontrei o cronograma nessa planilha. Ela precisa ter uma linha de cabeçalho com “Formato” (e as colunas de data, Conteúdo, Copy para arte, Imagem, Legenda e OBS).');
+  aplicarPlanilha(doc, lidos, editorial?.pilares || [], new Date().toISOString(), trilha, meta);
+}
+
+// Troca os conteúdos da planilha nesta trilha, mantendo andamento e comentários de cada um.
+function aplicarPlanilha(doc, lidos, pilares, quando, trilha, meta) {
+  const normal = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const pilarPorNome = new Map(pilares.map((p) => [normal(p.nome), p.id]));
+  const daPlanilha = (p) => naTrilha(p, trilha) && p.origem === 'planilha';
+  const anteriores = new Map(doc.posts.filter(daPlanilha).map((p) => [p.chavePlanilha, p]));
+  const doMes = lidos.filter((p) => p.data.startsWith(`${doc.mes}-`));
+  const novoStatus = doc.status === 'publicado' ? 'aprovacao' : 'pauta';
+  doc.posts = doc.posts.filter((p) => !daPlanilha(p)).concat(doMes.map((p) => {
+    const antes = anteriores.get(p.chave);
+    return {
+      id: antes?.id || novoId('p'),
+      chavePlanilha: p.chave,
+      data: p.data,
+      horario: texto(p.horario, 40),
+      formato: FORMATOS[p.formato] ? p.formato : 'reel',
+      pilarId: pilarPorNome.get(normal(p.pilar)) || null,
+      titulo: texto(p.titulo, 300),
+      gancho: texto(p.gancho, 2000),
+      roteiro: texto(p.roteiro, 10000),
+      legenda: texto(p.legenda, 5000),
+      referencias: (p.referencias || []).slice(0, 20).map((r) => ({ rotulo: texto(r.rotulo, 80), url: texto(r.url, 1000) })),
+      midia: (p.midia || []).filter((m) => /^[\w-]{10,100}$/.test(m.id || '')).slice(0, 20).map((m) => ({ id: m.id })),
+      notaInterna: texto(p.notaInterna, 2000),
+      status: antes?.status || novoStatus,
+      statusPor: antes?.statusPor,
+      comentarios: antes?.comentarios || [],
+      ideiaId: null,
+      origem: 'planilha',
+      ...(trilha === 'vie' ? { trilha } : {}),
+    };
+  }));
+  doc.posts.sort((a, b) => (a.data + a.horario).localeCompare(b.data + b.horario));
+  const outrosMeses = [...new Set(lidos.map((p) => p.data.slice(0, 7)).filter((m) => m !== doc.mes))].sort();
+  doc[TRILHAS[trilha].planilha] = { ...meta, lidaEm: quando, total: doMes.length, foraDoMes: lidos.length - doMes.length, outrosMeses };
+}
+
 const statusDaMarca = (p) => (p.marcaHtml === 'gravado' ? 'gravado' : 'postado');
 
 function contar(posts) {
@@ -319,8 +433,10 @@ function aplicarLeitura(doc, lidos, pilares, quando, trilha = 'cliente', { mante
   const { prefixo, leitura } = TRILHAS[trilha];
   const normal = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const pilarPorNome = new Map(pilares.map((p) => [normal(p.nome), p.id]));
-  const daTrilha = doc.posts.filter((p) => naTrilha(p, trilha) && !(manterManuais && p.origem !== 'html'));
-  const outros = doc.posts.filter((p) => !naTrilha(p, trilha) || (manterManuais && p.origem !== 'html'));
+  // A leitura do HTML nunca mexe nos conteúdos que vieram da planilha.
+  const fica = (p) => !naTrilha(p, trilha) || p.origem === 'planilha' || (manterManuais && p.origem !== 'html');
+  const daTrilha = doc.posts.filter((p) => !fica(p));
+  const outros = doc.posts.filter(fica);
   const anteriores = new Map(daTrilha.map((p) => [p.chaveHtml || `${p.data}|${p.formato}`, p]));
   const aprovado = doc.aprovacaoMes?.status === 'aprovado';
   const marcas = doc.marcasHtml || {};

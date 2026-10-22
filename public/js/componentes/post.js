@@ -23,6 +23,28 @@ export function etiquetaTrilha(p, admin) {
     : `<span class="etq trilha-cliente">${admin ? 'Cliente' : 'Você'}</span>`;
 }
 
+// Artes e vídeos que estão no Drive (links da planilha). Abrem direto do Google:
+// os arquivos precisam estar compartilhados como "Qualquer pessoa com o link".
+export const capaDrive = (id, largura = 600) => `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${largura}`;
+const linkDrive = (id) => `https://drive.google.com/file/d/${encodeURIComponent(id)}/view`;
+
+function galeriaDrive(p) {
+  if (!p.midia?.length) return '';
+  const vertical = ['story', 'reel'].includes(p.formato);
+  return `
+    <div class="secao-post">
+      <span class="mono" style="display:flex;align-items:center">${p.midia.length > 1 ? `Arte · ${p.midia.length} arquivos` : 'Arte'}<a class="btn fantasma peq" style="margin-left:auto" href="${linkDrive(p.midia[0].id)}" target="_blank" rel="noopener">${icones.link}Abrir no Drive</a></span>
+      <div class="galeria-drive${vertical ? ' vertical' : ''}">
+        ${p.midia.map((m, i) => `
+          <figure>
+            <iframe src="https://drive.google.com/file/d/${encodeURIComponent(m.id)}/preview" loading="lazy" allow="autoplay; fullscreen" allowfullscreen title="Arquivo ${i + 1}"></iframe>
+            ${p.midia.length > 1 ? `<figcaption><a href="${linkDrive(m.id)}" target="_blank" rel="noopener">${i + 1} de ${p.midia.length} · abrir</a></figcaption>` : ''}
+          </figure>`).join('')}
+      </div>
+      <p class="muted" style="font-size:12.5px">Não carregou? Toque em “Abrir no Drive”.</p>
+    </div>`;
+}
+
 const rotaCron = (ctx, mes) => `cronograma?cliente=${encodeURIComponent(ctx.cliente.id)}&mes=${mes}`;
 
 // Abre a gaveta. `aoMudar(doc)` recebe o cronograma atualizado depois de qualquer alteração.
@@ -59,6 +81,7 @@ export async function abrirPost({ ctx, mes, post, aoMudar, editar = false }) {
         <p class="mono muted" style="font-size:10.5px">${esc(dataLonga(p.data))}${p.horario ? ` · ${esc(p.horario)}` : ''}</p>
         <h2 style="margin-top:6px">${p.titulo ? esc(p.titulo) : '<span class="sem-titulo">Sem título</span>'}</h2>
       </div>
+      ${galeriaDrive(p)}
       <div class="secao-post">
         <span class="mono">Status</span>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">

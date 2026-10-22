@@ -37,7 +37,8 @@ export async function render(el, ctx) {
     const posts = doc.posts || [];
     const hoje = hojeISO();
     const deHoje = posts.filter((p) => p.data === hoje);
-    const paraAprovar = posts.filter((p) => p.status === 'aprovacao').length;
+    // No HTML a aprovação é do mês inteiro; aqui contam os conteúdos aprovados um a um.
+    const paraAprovar = posts.filter((p) => p.status === 'aprovacao' && p.origem !== 'html').length;
     const ajustes = posts.filter((p) => p.status === 'ajuste').length;
 
     const frases = [];
@@ -45,7 +46,7 @@ export async function render(el, ctx) {
     const divisaoHoje = separado && deHoje.length ? ` (${[vieHoje && `a Vie publica ${vieHoje}`, deHoje.length - vieHoje && `${admin ? 'o cliente' : 'você'} ${deHoje.length - vieHoje === 1 ? 'tem 1' : `tem ${deHoje.length - vieHoje}`}`].filter(Boolean).join(', ')})` : '';
     if (mes === mesAtual()) frases.push(deHoje.length ? `Hoje ${deHoje.length === 1 ? 'tem 1 conteúdo' : `tem ${deHoje.length} conteúdos`} no cronograma${divisaoHoje}` : 'Hoje não tem conteúdo de feed no cronograma');
     if (admin && ajustes) frases.push(`${ajustes} ${ajustes === 1 ? 'ajuste pedido' : 'ajustes pedidos'} pelo cliente`);
-    if (!admin && paraAprovar && !temInterativo(doc)) frases.push(`${paraAprovar} ${paraAprovar === 1 ? 'conteúdo esperando' : 'conteúdos esperando'} a sua aprovação`);
+    if (!admin && paraAprovar) frases.push(`${paraAprovar} ${paraAprovar === 1 ? 'conteúdo esperando' : 'conteúdos esperando'} a sua aprovação`);
     const apMes = temInterativo(doc) ? doc.aprovacaoMes?.status || 'aguardando' : null;
     if (!admin && apMes === 'aguardando') frases.push(`o cronograma de ${nomeDoMes(mes).split(' ')[0].toLowerCase()} está esperando a sua aprovação`);
     if (admin && doc.status === 'publicado' && apMes === 'ajuste') frases.push('o cliente pediu ajuste no cronograma do mês');
