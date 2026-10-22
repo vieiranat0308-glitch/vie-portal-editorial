@@ -2,14 +2,16 @@
 import { api, esc, falhou, hojeISO, mesAtual, somarMes, saudacao, diaSemanaCurto, dataLonga, compacto, num, icones } from '../ui.js';
 import { FORMATOS, STATUS, nomeDoMes, corDoPilar } from '../regras.js';
 import { linhaSuave, miniCalendario } from '../componentes/graficos.js';
-import { abrirPost, etiquetaFormato, etiquetaStatus } from '../componentes/post.js';
-import { faixaAprovacaoMes, ligarAprovacaoMes } from '../componentes/aprovacao-mes.js';
+import { abrirPost, etiquetaFormato, etiquetaStatus, etiquetaTrilha } from '../componentes/post.js';
+import { faixaAprovacaoMes, ligarAprovacaoMes, temInterativo } from '../componentes/aprovacao-mes.js';
 
 export async function render(el, ctx) {
   // Cliente sem cronograma nos serviços (ex.: só tráfego) vê uma visão geral de resultados.
   if (ctx.abas && !ctx.abas.has('cronograma')) return visaoResultados(el, ctx);
   const { cliente, admin } = ctx;
   const id = encodeURIComponent(cliente.id);
+  // Gestão de Instagram: o mês soma o cronograma da Vie e o do cliente, com quem faz cada conteúdo.
+  const separado = !!ctx.abas?.has('cronogramaVie');
   let mes = mesAtual();
   let selecionado = hojeISO();
   ctx.topo('Geral', 'Visão geral', admin
@@ -39,13 +41,15 @@ export async function render(el, ctx) {
     const ajustes = posts.filter((p) => p.status === 'ajuste').length;
 
     const frases = [];
-    if (mes === mesAtual()) frases.push(deHoje.length ? `Hoje ${deHoje.length === 1 ? 'tem 1 conteúdo' : `tem ${deHoje.length} conteúdos`} no cronograma` : 'Hoje não tem conteúdo de feed no cronograma');
+    const vieHoje = deHoje.filter((p) => p.trilha === 'vie').length;
+    const divisaoHoje = separado && deHoje.length ? ` (${[vieHoje && `a Vie publica ${vieHoje}`, deHoje.length - vieHoje && `${admin ? 'o cliente' : 'você'} ${deHoje.length - vieHoje === 1 ? 'tem 1' : `tem ${deHoje.length - vieHoje}`}`].filter(Boolean).join(', ')})` : '';
+    if (mes === mesAtual()) frases.push(deHoje.length ? `Hoje ${deHoje.length === 1 ? 'tem 1 conteúdo' : `tem ${deHoje.length} conteúdos`} no cronograma${divisaoHoje}` : 'Hoje não tem conteúdo de feed no cronograma');
     if (admin && ajustes) frases.push(`${ajustes} ${ajustes === 1 ? 'ajuste pedido' : 'ajustes pedidos'} pelo cliente`);
-    if (!admin && paraAprovar && !doc.interativo) frases.push(`${paraAprovar} ${paraAprovar === 1 ? 'conteúdo esperando' : 'conteúdos esperando'} a sua aprovação`);
-    const apMes = doc.interativo ? doc.aprovacaoMes?.status || 'aguardando' : null;
+    if (!admin && paraAprovar && !temInterativo(doc)) frases.push(`${paraAprovar} ${paraAprovar === 1 ? 'conteúdo esperando' : 'conteúdos esperando'} a sua aprovação`);
+    const apMes = temInterativo(doc) ? doc.aprovacaoMes?.status || 'aguardando' : null;
     if (!admin && apMes === 'aguardando') frases.push(`o cronograma de ${nomeDoMes(mes).split(' ')[0].toLowerCase()} está esperando a sua aprovação`);
     if (admin && doc.status === 'publicado' && apMes === 'ajuste') frases.push('o cliente pediu ajuste no cronograma do mês');
-    if (admin && doc.status === 'rascunho') frases.push(posts.length || doc.interativo ? 'o cronograma deste mês ainda está em rascunho, o cliente não vê' : 'o cronograma deste mês ainda não foi montado');
+    if (admin && doc.status === 'rascunho') frases.push(posts.length || temInterativo(doc) ? 'o cronograma deste mês ainda está em rascunho, o cliente não vê' : 'o cronograma deste mês ainda não foi montado');
 
     const porStatus = Object.fromEntries(Object.keys(STATUS).map((k) => [k, posts.filter((p) => p.status === k).length]));
     const porFormato = Object.fromEntries(Object.keys(FORMATOS).map((k) => [k, posts.filter((p) => p.formato === k).length]));
@@ -108,6 +112,8 @@ export async function render(el, ctx) {
                 const n = posts.filter((x) => x.pilarId === p.id).length;
                 return n ? `<span style="flex:${n};--cor:${corDoPilar(pilares, p.id)}" title="${esc(p.nome)}: ${n}"></span>` : '';
               }).join('')}</div>` : ''}
+              ${separado && posts.length ? `<div class="divisao-trilhas">${[['vie', 'Vie publica'], ['cliente', admin ? 'Cliente' : 'Com você']].map(([t, rot]) => `
+                <a href="#${ctx.base}/cronograma/${mes}"><b>${posts.filter((p) => (p.trilha === 'vie' ? 'vie' : 'cliente') === t).length}</b><span>${rot}</span></a>`).join('')}</div>` : ''}
             </div>
           </div>
 
@@ -123,7 +129,7 @@ export async function render(el, ctx) {
           <div class="cartao">
             <div class="cab"><h3>Próximos conteúdos</h3><a class="btn claro peq" style="margin-left:auto" href="#${ctx.base}/cronograma/${mes}">Ver mês</a></div>
             ${!disponivel ? `<div class="vazio"><strong>Em preparação</strong>O cronograma de ${esc(nomeDoMes(mes))} está sendo finalizado pela equipe Vie.</div>`
-              : doc.interativo && !posts.length ? `
+              : temInterativo(doc) && !posts.length ? `
                 <div class="objetivo" style="background:var(--acc-soft);border-color:transparent">
                   <div style="flex:1">
                     <span class="mono">Cronograma interativo</span>
@@ -172,7 +178,7 @@ export async function render(el, ctx) {
         <span class="data"><b>${Number(p.data.slice(8))}</b><small>${esc(diaSemanaCurto(p.data))}</small></span>
         <span style="min-width:0">
           <span class="titulo" style="display:block">${p.titulo ? esc(p.titulo) : '<span class="sem-titulo">Sem título</span>'}</span>
-          <span class="meta">${etiquetaFormato(p.formato)}${p.horario ? `<span>${esc(p.horario)}</span>` : ''}${pilares.find((x) => x.id === p.pilarId) ? `<span style="color:${corDoPilar(pilares, p.pilarId)}">● ${esc(pilares.find((x) => x.id === p.pilarId).nome)}</span>` : ''}</span>
+          <span class="meta">${separado ? etiquetaTrilha(p, admin) : ''}${etiquetaFormato(p.formato)}${p.horario ? `<span>${esc(p.horario)}</span>` : ''}${pilares.find((x) => x.id === p.pilarId) ? `<span style="color:${corDoPilar(pilares, p.pilarId)}">● ${esc(pilares.find((x) => x.id === p.pilarId).nome)}</span>` : ''}</span>
           ${compacto ? `<span class="meta">${etiquetaStatus(p.status)}</span>` : ''}
         </span>
         ${compacto ? '' : etiquetaStatus(p.status)}

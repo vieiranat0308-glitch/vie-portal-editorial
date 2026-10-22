@@ -3,8 +3,10 @@
 import { api, esc, aviso, falhou, abrirCamada, quando } from '../ui.js';
 import { nomeDoMes } from '../regras.js';
 
+export const temInterativo = (doc) => !!(doc?.interativo || doc?.interativoVie);
+
 export function situacaoMes(doc) {
-  if (!doc?.interativo) return null;
+  if (!temInterativo(doc)) return null;
   return doc.aprovacaoMes?.status || 'aguardando';
 }
 
@@ -89,10 +91,10 @@ export function ligarAprovacaoMes(el, { ctx, mes, aoMudar }) {
 }
 
 // Lê de novo os posts do HTML já salvo (leitura do próprio portal, sem custo).
-export async function lerPostsDoHtml(ctx, mes) {
+export async function lerPostsDoHtml(ctx, mes, trilha = 'cliente') {
   try {
-    const doc = await api(`cronograma?cliente=${encodeURIComponent(ctx.cliente.id)}&mes=${mes}`, { metodo: 'POST', corpo: { acao: 'ler-html' } });
-    avisarLeitura(doc);
+    const doc = await api(`cronograma?cliente=${encodeURIComponent(ctx.cliente.id)}&mes=${mes}`, { metodo: 'POST', corpo: { acao: 'ler-html', trilha } });
+    avisarLeitura(doc, trilha);
     ctx.atualizarContadores?.();
     return doc;
   } catch (err) {
@@ -101,13 +103,13 @@ export async function lerPostsDoHtml(ctx, mes) {
   }
 }
 
-export function avisarLeitura(doc) {
-  const l = doc.leituraHtml;
+export function avisarLeitura(doc, trilha = 'cliente') {
+  const l = trilha === 'vie' ? doc.leituraHtmlVie : doc.leituraHtml;
   if (!l) return;
   if (!l.total) {
     aviso('Não encontrei posts neste HTML. Se ele estiver num formato diferente do modelo da Vie, me mande o arquivo para ajustar a leitura.', { erro: true });
     return;
   }
-  const feed = doc.posts.filter((p) => p.formato !== 'story').length;
+  const feed = doc.posts.filter((p) => (p.trilha === 'vie') === (trilha === 'vie') && p.formato !== 'story').length;
   aviso(`${l.total} conteúdos lidos do HTML (${feed} no feed e ${l.total - feed} de stories). A visão geral já está atualizada.`);
 }

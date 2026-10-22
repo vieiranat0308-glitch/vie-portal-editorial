@@ -8,7 +8,7 @@ import { etiquetasServicos } from '../componentes/servicos.js';
 let filtroServico = '';
 
 const NOMES_ABAS = {
-  linha: 'Linha editorial', cronograma: 'Cronograma', aprovacao: 'Aprovação', ideias: 'Banco de ideias', evolucao: 'Evolução do perfil', metricas: 'Métricas',
+  linha: 'Linha editorial', cronograma: 'Cronograma', cronogramaVie: 'Cronograma da Vie separado', aprovacao: 'Aprovação', ideias: 'Banco de ideias', evolucao: 'Evolução do perfil', metricas: 'Métricas',
 };
 // O cliente tem algum serviço que inclui a aba?
 const temAba = (c, aba, servicos) => servicos.some((s) => (c.servicos || []).includes(s.id) && (s.abas || []).includes(aba));
@@ -145,7 +145,7 @@ async function paginaServicos(el, ctx) {
 
   function desenhar() {
     el.innerHTML = `
-      <section class="saudacao"><h1>Serviços</h1><p>Os serviços que a Vie presta viram etiquetas nos clientes e definem as abas que cada cliente vê no portal. Visão geral e Documentos aparecem sempre; quem tem mais de um serviço vê a soma das abas.</p></section>
+      <section class="saudacao"><h1>Serviços</h1><p>Os serviços que a Vie presta viram etiquetas nos clientes e definem as abas que cada cliente vê no portal. Visão geral e Documentos aparecem sempre; quem tem mais de um serviço vê a soma das abas. “Cronograma da Vie separado” divide o Cronograma em duas partes: o que a Vie produz e publica, e o que o cliente grava e posta.</p></section>
       <div class="cartao" style="margin-top:22px;max-width:760px;display:grid;gap:10px">
         ${lista.map((s, i) => `
           <div class="linha-servico">

@@ -553,3 +553,18 @@ textarea.entrada { resize: vertical; min-height: 84px; line-height: 1.5; }
 .linha-servico { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .linha-servico .abas-servico { grid-column: 2 / -1; }
 .abas-servico label { font-size: 12.5px; padding: 4px 9px; }
+
+/* Cronograma dividido: o que a Vie publica e o que o cliente faz */
+.trilhas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+.trilhas button { text-align: left; border: 1px solid var(--line); background: var(--card); border-radius: 14px; padding: 14px 16px; cursor: pointer; display: grid; gap: 3px; color: var(--ink); }
+.trilhas button b { font: 500 19px var(--serif); }
+.trilhas button small { font-size: 12.5px; color: var(--muted); }
+.trilhas button.ativo { background: var(--choc); border-color: var(--choc); color: var(--creme); }
+.trilhas button.ativo small { color: var(--creme-2, var(--creme)); opacity: .8; }
+@media (max-width: 560px) { .trilhas { grid-template-columns: 1fr; } }
+.etq.trilha-vie { --cor: var(--acc); background: var(--acc); color: #fff; border-color: transparent; }
+.etq.trilha-cliente { --cor: var(--choc); }
+.divisao-trilhas { display: flex; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.divisao-trilhas a { flex: 1; display: grid; gap: 2px; text-decoration: none; color: inherit; }
+.divisao-trilhas b { font: 500 24px var(--serif); }
+.divisao-trilhas span { font-size: 12.5px; color: var(--muted); }

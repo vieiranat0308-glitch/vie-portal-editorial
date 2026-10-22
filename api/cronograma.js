@@ -9,6 +9,17 @@ import { FORMATOS, STATUS, STATUS_DO_CLIENTE, gerarEsqueleto } from '../public/j
 // O cliente só enxerga o mês depois que a Vie publica.
 // O mês também pode ter um "cronograma interativo": um arquivo HTML pronto,
 // feito pela equipe, que aparece dentro do portal.
+// Na Gestão de Instagram o mês tem duas trilhas: o cronograma da Vie (o que a
+// equipe produz e publica) e o do cliente (o que ele grava e posta). Cada uma
+// pode ter o próprio HTML; os posts guardam a trilha em `trilha`.
+export const TRILHAS = {
+  cliente: { arquivo: 'interativo', leitura: 'leituraHtml', prefixo: '' },
+  vie: { arquivo: 'interativoVie', leitura: 'leituraHtmlVie', prefixo: 'vie:' },
+};
+const trilhaDe = (v) => (v === 'vie' ? 'vie' : 'cliente');
+const naTrilha = (p, trilha) => (p.trilha === 'vie' ? 'vie' : 'cliente') === trilha;
+export const temInterativo = (d) => !!(d?.interativo || d?.interativoVie);
+
 export default handler(async (req, res, usuario) => {
   metodo(req, 'GET', 'POST');
   const clienteId = String(req.query.cliente || '');
@@ -26,8 +37,8 @@ export default handler(async (req, res, usuario) => {
         status: d.status,
         total: d.posts.length,
         porStatus: contar(d.posts),
-        interativo: !!d.interativo,
-        aprovacaoMes: d.interativo ? d.aprovacaoMes?.status || 'aguardando' : null,
+        interativo: temInterativo(d),
+        aprovacaoMes: temInterativo(d) ? d.aprovacaoMes?.status || 'aguardando' : null,
       }));
     return res.status(200).json(lista);
   }
@@ -35,11 +46,13 @@ export default handler(async (req, res, usuario) => {
   const mes = mesValido(req.query.mes);
   const chave = keys.cronograma(clienteId, mes);
   const doc = (await redis.get(chave)) || { mes, status: 'rascunho', foco: '', observacoes: '', posts: [] };
+  const trilha = trilhaDe(req.query.trilha || (req.query.interativo ? '' : req.body?.trilha));
+  const { arquivo: campoArquivo, leitura: campoLeitura } = TRILHAS[trilha];
 
   if (req.method === 'GET' && req.query.interativo) {
     if (!admin && doc.status !== 'publicado') throw new HttpError(403, 'Este cronograma ainda não foi liberado.');
-    if (!doc.interativo) throw new HttpError(404, 'Este mês não tem cronograma interativo.');
-    const arquivo = await lerArquivo(doc.interativo.arquivoId);
+    if (!doc[campoArquivo]) throw new HttpError(404, 'Este mês não tem cronograma interativo.');
+    const arquivo = await lerArquivo(doc[campoArquivo].arquivoId);
     let html = arquivo.conteudo;
     // Dentro do portal, liga as caixinhas Feito/Publicado/Usada do HTML ao andamento salvo.
     if (req.query.portal) {
@@ -65,12 +78,12 @@ export default handler(async (req, res, usuario) => {
     }
     const nome = texto(req.query.nome || 'cronograma.html', 150).replace(/[^\w.\- ()À-ú]/g, '_');
     const arquivoId = await salvarArquivo(clienteId, nome, 'text/html', conteudo);
-    if (doc.interativo) await apagarArquivo(doc.interativo.arquivoId);
-    doc.interativo = { arquivoId, nome, tamanho: conteudo.length, enviadoEm: new Date().toISOString(), enviadoPor: usuario.nome };
+    if (doc[campoArquivo]) await apagarArquivo(doc[campoArquivo].arquivoId);
+    doc[campoArquivo] = { arquivoId, nome, tamanho: conteudo.length, enviadoEm: new Date().toISOString(), enviadoPor: usuario.nome };
     doc.aprovacaoMes = null; // versão nova volta a esperar a aprovação do cliente
     const editorial = await redis.get(keys.editorial(clienteId));
-    aplicarLeitura(doc, lerCronogramaHtml(conteudo.toString('utf8'), mes), editorial?.pilares || [], new Date().toISOString());
-    doc.atualizadoEm = doc.interativo.enviadoEm;
+    aplicarLeitura(doc, lerCronogramaHtml(conteudo.toString('utf8'), mes), editorial?.pilares || [], doc[campoArquivo].enviadoEm, trilha);
+    doc.atualizadoEm = doc[campoArquivo].enviadoEm;
     await redis.set(chave, doc);
     await redis.sadd(keys.meses(clienteId), mes);
     return res.status(200).json(doc);
@@ -101,7 +114,7 @@ export default handler(async (req, res, usuario) => {
 
     case 'salvar-post': {
       exigirAdmin(usuario);
-      const limpo = limparPost(corpo.post || {}, mes);
+      const limpo = limparPost(corpo.post || {}, mes, trilha);
       salvoId = limpo.id;
       const i = doc.posts.findIndex((p) => p.id === limpo.id);
       if (i >= 0) {
@@ -115,17 +128,20 @@ export default handler(async (req, res, usuario) => {
     // Lê de novo os posts do cronograma em HTML que já está salvo.
     case 'ler-html': {
       exigirAdmin(usuario);
-      if (!doc.interativo) throw new HttpError(400, 'Suba o cronograma em HTML antes.');
-      const [arquivo, editorial] = await Promise.all([lerArquivo(doc.interativo.arquivoId), redis.get(keys.editorial(clienteId))]);
-      aplicarLeitura(doc, lerCronogramaHtml(arquivo.conteudo.toString('utf8'), mes), editorial?.pilares || [], assinatura.em);
+      if (!doc[campoArquivo]) throw new HttpError(400, 'Suba o cronograma em HTML antes.');
+      const [arquivo, editorial] = await Promise.all([lerArquivo(doc[campoArquivo].arquivoId), redis.get(keys.editorial(clienteId))]);
+      aplicarLeitura(doc, lerCronogramaHtml(arquivo.conteudo.toString('utf8'), mes), editorial?.pilares || [], assinatura.em, trilha);
       break;
     }
 
     // Caixinha Feito/Publicado/Usada marcada dentro do cronograma em HTML.
     case 'marcar-html': {
       if (!admin && doc.status !== 'publicado') throw new HttpError(403, 'Este cronograma ainda não foi liberado.');
-      const chave = texto(corpo.chave, 40);
-      if (!/^[\w-]+$/.test(chave)) throw new HttpError(400, 'Caixinha inválida.');
+      const bruta = texto(corpo.chave, 40);
+      if (!/^[\w-]+$/.test(bruta)) throw new HttpError(400, 'Caixinha inválida.');
+      const chave = TRILHAS[trilha].prefixo + bruta;
+      // O cronograma da Vie é marcado pela equipe, que é quem publica.
+      if (trilha === 'vie' && !admin) throw new HttpError(403, 'Este cronograma é marcado pela equipe Vie.');
       doc.marcasHtml = { ...(doc.marcasHtml || {}), [chave]: !!corpo.feito };
       const alvo = doc.posts.find((p) => p.chaveHtml === chave);
       if (alvo) {
@@ -140,9 +156,10 @@ export default handler(async (req, res, usuario) => {
 
     case 'remover-interativo':
       exigirAdmin(usuario);
-      if (doc.interativo) await apagarArquivo(doc.interativo.arquivoId);
-      delete doc.interativo;
-      doc.aprovacaoMes = null;
+      if (doc[campoArquivo]) await apagarArquivo(doc[campoArquivo].arquivoId);
+      delete doc[campoArquivo];
+      delete doc[campoLeitura];
+      if (!temInterativo(doc)) doc.aprovacaoMes = null;
       break;
 
     // Aprovação do mês inteiro (usada no cronograma interativo).
@@ -183,9 +200,9 @@ export default handler(async (req, res, usuario) => {
         mes,
         frequencia: slots,
         ideias: ideias || [],
-        datasOcupadas: doc.posts.map((p) => `${p.data}|${p.formato}`),
+        datasOcupadas: doc.posts.filter((p) => naTrilha(p, trilha)).map((p) => `${p.data}|${p.formato}`),
       });
-      doc.posts.push(...novos.map((p) => ({ ...p, comentarios: [] })));
+      doc.posts.push(...novos.map((p) => ({ ...p, ...(trilha === 'vie' ? { trilha } : {}), comentarios: [] })));
       const usadas = new Set(novos.map((p) => p.ideiaId).filter(Boolean));
       if (usadas.size) {
         await redis.set(keys.ideias(clienteId), ideias.map((i) => (usadas.has(i.id) ? { ...i, usadaEm: mes } : i)));
@@ -240,7 +257,7 @@ function paraCliente(doc) {
   return { ...doc, posts: doc.posts.map(({ notaInterna, ...p }) => p) };
 }
 
-function limparPost(p, mes) {
+function limparPost(p, mes, trilha) {
   if (!String(p.data || '').startsWith(`${mes}-`) || !/^\d{4}-\d{2}-\d{2}$/.test(p.data)) {
     throw new HttpError(400, 'A data do conteúdo precisa estar dentro do mês do cronograma.');
   }
@@ -261,19 +278,24 @@ function limparPost(p, mes) {
     notaInterna: texto(p.notaInterna, 2000),
     status: STATUS[p.status] ? p.status : 'pauta',
     ideiaId: p.ideiaId ? texto(p.ideiaId, 40) : null,
+    ...(trilha === 'vie' ? { trilha } : {}),
   };
 }
 
-// Troca os conteúdos do mês pelos lidos do HTML, mantendo o andamento já marcado.
-function aplicarLeitura(doc, lidos, pilares, quando) {
-  const [anoMes] = [doc.mes];
+// Troca os conteúdos da trilha pelos lidos do HTML, mantendo o andamento já marcado.
+// Os conteúdos da outra trilha ficam como estão.
+function aplicarLeitura(doc, lidos, pilares, quando, trilha = 'cliente') {
+  const anoMes = doc.mes;
+  const { prefixo, leitura } = TRILHAS[trilha];
   const normal = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const pilarPorNome = new Map(pilares.map((p) => [normal(p.nome), p.id]));
-  const anteriores = new Map(doc.posts.map((p) => [p.chaveHtml || `${p.data}|${p.formato}`, p]));
+  const daTrilha = doc.posts.filter((p) => naTrilha(p, trilha));
+  const outros = doc.posts.filter((p) => !naTrilha(p, trilha));
+  const anteriores = new Map(daTrilha.map((p) => [p.chaveHtml || `${p.data}|${p.formato}`, p]));
   const aprovado = doc.aprovacaoMes?.status === 'aprovado';
   const marcas = doc.marcasHtml || {};
-  const doMes = lidos.filter((p) => p.data.startsWith(`${anoMes}-`));
-  doc.posts = doMes.map((p) => {
+  const doMes = lidos.filter((p) => p.data.startsWith(`${anoMes}-`)).map((p) => ({ ...p, chaveHtml: prefixo + p.chaveHtml }));
+  doc.posts = outros.concat(doMes.map((p) => {
     const antes = anteriores.get(p.chaveHtml) || anteriores.get(`${p.data}|${p.formato}`);
     // O andamento já marcado (aprovado, gravado, postado) continua valendo na versão nova.
     const manter = antes && ['aprovado', 'gravado', 'postado'].includes(antes.status);
@@ -297,8 +319,9 @@ function aplicarLeitura(doc, lidos, pilares, quando) {
       comentarios: antes?.comentarios || [],
       ideiaId: null,
       origem: 'html',
+      ...(trilha === 'vie' ? { trilha } : {}),
     };
-  });
+  }));
   doc.posts.sort((a, b) => (a.data + a.horario).localeCompare(b.data + b.horario));
-  doc.leituraHtml = { em: quando, total: doc.posts.length, foraDoMes: lidos.length - doMes.length };
+  doc[leitura] = { em: quando, total: doMes.length, foraDoMes: lidos.length - doMes.length };
 }

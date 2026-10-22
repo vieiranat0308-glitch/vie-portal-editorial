@@ -1,11 +1,14 @@
 // Cronograma mensal: calendário, lista por semana, prévia do feed e stories,
 // ou o cronograma interativo (HTML pronto feito pela equipe Vie).
+// Na Gestão de Instagram o mês se divide em duas trilhas: o cronograma da Vie
+// (o que a equipe produz e publica) e o do cliente (o que ele grava e posta).
 import { api, esc, aviso, falhou, abrirCamada, confirmar, hojeISO, mesAtual, somarMes, dataObj, dataCurta, diaSemanaCurto, quando, icones, iniciais } from '../ui.js';
 import { FORMATOS, nomeDoMes, corDoPilar } from '../regras.js';
 import { abrirPost, etiquetaFormato, etiquetaPilar, etiquetaStatus } from '../componentes/post.js';
-import { faixaAprovacaoMes, ligarAprovacaoMes, lerPostsDoHtml, avisarLeitura } from '../componentes/aprovacao-mes.js';
+import { faixaAprovacaoMes, ligarAprovacaoMes, lerPostsDoHtml, avisarLeitura, temInterativo } from '../componentes/aprovacao-mes.js';
 
 let visaoSalva = 'calendario';
+const trilhaSalva = {}; // por pessoa e cliente, enquanto a página estiver aberta
 
 export async function render(el, ctx) {
   const { cliente, admin } = ctx;
@@ -13,6 +16,14 @@ export async function render(el, ctx) {
   const mes = /^\d{4}-\d{2}$/.test(ctx.rota.extra || '') ? ctx.rota.extra : mesAtual();
   try { visaoSalva = localStorage.getItem('vie-visao') || visaoSalva; } catch { /* sem armazenamento */ }
   let visao = visaoSalva;
+  const separado = !!ctx.abas?.has('cronogramaVie');
+  // A Vie abre no que ela produz; o cliente, no que ele precisa fazer.
+  const chaveTrilha = `${ctx.usuario?.email}|${cliente.id}`;
+  let trilha = separado ? trilhaSalva[chaveTrilha] || (admin ? 'vie' : 'cliente') : 'cliente';
+  const nomeTrilha = { vie: 'Cronograma da Vie', cliente: admin ? 'Cronograma do cliente' : 'Seu cronograma' };
+  const daTrilha = (p) => !separado || (p.trilha === 'vie' ? 'vie' : 'cliente') === trilha;
+  const arquivoDaTrilha = () => (trilha === 'vie' ? doc.interativoVie : doc.interativo);
+  const leituraDaTrilha = () => (trilha === 'vie' ? doc.leituraHtmlVie : doc.leituraHtml);
 
   const acoes = ctx.topo('Geral', 'Cronograma', `
     <div class="seletor-mes">
@@ -27,9 +38,9 @@ export async function render(el, ctx) {
   const pilares = editorial.pilares || [];
   let doc = await api(`cronograma?cliente=${id}&mes=${mes}`);
   // Mês com cronograma em HTML abre direto nele.
-  if (doc.interativo) visao = 'interativo';
+  if (arquivoDaTrilha()) visao = 'interativo';
 
-  const novo = (data) => abrirPost({ ctx, mes, post: { data, formato: 'reel', status: 'pauta' }, aoMudar: atualizar });
+  const novo = (data) => abrirPost({ ctx, mes, post: { data, formato: 'reel', status: 'pauta', ...(trilha === 'vie' ? { trilha } : {}) }, aoMudar: atualizar });
   acoes.querySelector('[data-novo]')?.addEventListener('click', () => novo(`${mes}-${mes === mesAtual() ? hojeISO().slice(8) : '01'}`));
 
   function atualizar(novoDoc) { doc = novoDoc; desenhar(); }
@@ -46,18 +57,30 @@ export async function render(el, ctx) {
       el.innerHTML = `<div class="vazio"><strong>Em preparação</strong>O cronograma de ${esc(nomeDoMes(mes))} ainda está sendo finalizado pela equipe Vie. Assim que for liberado, ele aparece aqui.</div>`;
       return;
     }
-    const posts = doc.posts || [];
+    const posts = (doc.posts || []).filter(daTrilha);
+    const html = arquivoDaTrilha();
+    const algumConteudo = temInterativo(doc) || (doc.posts || []).length;
     const abas = [
-      ...(doc.interativo ? [['interativo', 'Cronograma interativo']] : []),
-      ...(posts.length || !doc.interativo ? [['calendario', 'Calendário'], ['lista', 'Lista'], ['feed', 'Prévia do feed'], ['stories', 'Stories']] : []),
+      ...(html ? [['interativo', 'Cronograma interativo']] : []),
+      ...(posts.length || !html ? [['calendario', 'Calendário'], ['lista', 'Lista'], ['feed', 'Prévia do feed'], ['stories', 'Stories']] : []),
     ];
     if (!abas.some(([k]) => k === visao)) visao = abas[0][0];
     el.innerHTML = `
+      ${separado ? `
+        <div class="trilhas" role="tablist">
+          ${['vie', 'cliente'].map((t) => {
+            const n = (doc.posts || []).filter((p) => (p.trilha === 'vie' ? 'vie' : 'cliente') === t).length;
+            return `<button data-trilha="${t}" class="${trilha === t ? 'ativo' : ''}" role="tab" aria-selected="${trilha === t}">
+              <b>${nomeTrilha[t]}</b>
+              <small>${t === 'vie' ? 'O que a Vie produz e publica' : admin ? 'O que o cliente grava e posta' : 'O que você grava e posta'}${n ? ` · ${n}` : ''}</small>
+            </button>`;
+          }).join('')}
+        </div>` : ''}
       ${admin && doc.status !== 'publicado' ? `
         <div class="aviso-rascunho">
-          <span><b>Rascunho.</b> ${esc(cliente.nome)} ainda não vê este mês. ${doc.interativo || posts.length ? 'Revise e libere quando estiver pronto.' : 'Suba o cronograma pronto ou monte os conteúdos aqui no portal.'}</span>
-          ${!posts.length && !doc.interativo ? `<button class="btn claro peq" data-subir>${icones.baixar}Subir cronograma pronto (HTML)</button><button class="btn fantasma peq" data-esqueleto>Montar pela linha editorial</button>` : ''}
-          <button class="btn acc peq" data-publicar ${posts.length || doc.interativo ? '' : 'disabled'}>Liberar para o cliente</button>
+          <span><b>Rascunho.</b> ${esc(cliente.nome)} ainda não vê este mês. ${html || posts.length ? 'Revise e libere quando estiver pronto.' : `Suba ${separado ? `o ${nomeTrilha[trilha].toLowerCase()}` : 'o cronograma'} pronto ou monte os conteúdos aqui no portal.`}</span>
+          ${!posts.length && !html ? `<button class="btn claro peq" data-subir>${icones.baixar}Subir cronograma pronto (HTML)</button><button class="btn fantasma peq" data-esqueleto>Montar pela linha editorial</button>` : ''}
+          <button class="btn acc peq" data-publicar ${algumConteudo ? '' : 'disabled'}>Liberar para o cliente</button>
         </div>` : ''}
       ${faixaAprovacaoMes({ ctx, doc, mes, linkCronograma: false })}
 
@@ -67,7 +90,7 @@ export async function render(el, ctx) {
           ${doc.observacoes ? `<p class="obs">${esc(doc.observacoes)}</p>` : ''}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-          ${admin && (doc.interativo || posts.length) ? `<button class="btn claro peq" data-subir>${icones.baixar}${doc.interativo ? 'Substituir HTML' : 'Subir cronograma pronto (HTML)'}</button>` : ''}
+          ${admin && (html || posts.length) ? `<button class="btn claro peq" data-subir>${icones.baixar}${html ? 'Substituir HTML' : 'Subir cronograma pronto (HTML)'}</button>` : ''}
           ${admin ? `<button class="btn claro peq" data-foco>${icones.editar}Foco e recados</button>` : ''}
           ${admin && posts.length ? '<button class="btn claro peq" data-esqueleto>Completar pela linha editorial</button>' : ''}
           ${admin && doc.status === 'publicado' ? '<button class="btn fantasma peq" data-despublicar>Voltar para rascunho</button>' : ''}
@@ -88,12 +111,24 @@ export async function render(el, ctx) {
     const corpo = el.querySelector('[data-visao-corpo]');
     if (visao === 'interativo') corpo.innerHTML = interativo();
     else if (!posts.length && visao !== 'stories') {
-      corpo.innerHTML = `<div class="vazio"><strong>Nenhum conteúdo neste mês</strong>${admin ? 'Suba o cronograma pronto em HTML, ou monte os conteúdos aqui no portal (“Montar pela linha editorial” ou “Novo conteúdo”).' : ''}</div>`;
+      const texto = admin
+        ? 'Suba o cronograma pronto em HTML, ou monte os conteúdos aqui no portal (“Montar pela linha editorial” ou “Novo conteúdo”).'
+        : separado && trilha === 'vie' ? 'Neste mês a equipe Vie ainda não colocou aqui o que vai produzir e publicar.'
+          : separado ? 'Neste mês não há conteúdos para você gravar ou postar.' : '';
+      corpo.innerHTML = `<div class="vazio"><strong>Nenhum conteúdo ${separado ? `no ${nomeTrilha[trilha].toLowerCase()}` : 'neste mês'}</strong>${texto}</div>`;
     } else if (visao === 'calendario') corpo.innerHTML = calendario(posts);
     else if (visao === 'lista') corpo.innerHTML = lista(posts);
     else if (visao === 'feed') corpo.innerHTML = previaFeed(posts);
     else corpo.innerHTML = stories(posts);
 
+    el.querySelectorAll('[data-trilha]').forEach((b) => {
+      b.onclick = () => {
+        if (trilha === b.dataset.trilha) return;
+        trilha = trilhaSalva[chaveTrilha] = b.dataset.trilha;
+        visao = arquivoDaTrilha() ? 'interativo' : visaoSalva;
+        desenhar();
+      };
+    });
     el.querySelectorAll('[data-visao]').forEach((b) => {
       b.onclick = () => {
         visao = b.dataset.visao;
@@ -109,8 +144,8 @@ export async function render(el, ctx) {
       const m = abrirCamada(`
         <h2>Liberar ${esc(nomeDoMes(mes))}</h2>
         <p>${esc(cliente.nome)} vai passar a ver o cronograma deste mês no portal.</p>
-        ${doc.interativo ? '<p class="muted" style="font-size:14px">No cronograma interativo, o cliente pode aprovar o mês ou pedir ajuste com um comentário.</p>' : ''}
-        ${posts.length && !doc.interativo ? `<label class="opcoes-check"><label><input type="checkbox" checked data-pedir> Pedir aprovação dos conteúdos “Planejados”</label></label>
+        ${temInterativo(doc) ? '<p class="muted" style="font-size:14px">No cronograma interativo, o cliente pode aprovar o mês ou pedir ajuste com um comentário.</p>' : ''}
+        ${(doc.posts || []).length && !temInterativo(doc) ? `<label class="opcoes-check"><label><input type="checkbox" checked data-pedir> Pedir aprovação dos conteúdos “Planejados”</label></label>
         <p class="muted" style="font-size:13px">Com essa opção, os conteúdos ficam como “Para aprovar” e o cliente aprova ou pede ajuste em cada um.</p>` : ''}
         <div class="rodape-modal"><button class="btn claro" data-fechar>Cancelar</button><button class="btn acc" data-ok>Liberar para o cliente</button></div>`);
       m.el.querySelector('[data-ok]').onclick = async () => {
@@ -131,7 +166,7 @@ export async function render(el, ctx) {
         if (!(await confirmar(`Vou criar os conteúdos de ${nomeDoMes(mes)} seguindo a frequência da linha editorial (${slots.length} por semana) e puxar ideias ainda não usadas do banco. Dias que já têm conteúdo do mesmo formato são mantidos.`, { botao: 'Montar mês' }))) return;
         try {
           const antes = (doc.posts || []).length;
-          atualizar(await api(`cronograma?cliente=${id}&mes=${mes}`, { metodo: 'POST', corpo: { acao: 'esqueleto' } }));
+          atualizar(await api(`cronograma?cliente=${id}&mes=${mes}`, { metodo: 'POST', corpo: { acao: 'esqueleto', trilha } }));
           await ctx.ideias(true);
           aviso(`${doc.posts.length - antes} conteúdos criados. Revise e ajuste o que precisar.`);
         } catch (err) { falhou(err); }
@@ -140,13 +175,13 @@ export async function render(el, ctx) {
     el.querySelectorAll('[data-subir]').forEach((b) => { b.onclick = subirHtml; });
     el.querySelector('[data-remover-html]')?.addEventListener('click', async () => {
       if (!(await confirmar('O arquivo do cronograma interativo será removido deste mês.', { botao: 'Remover', perigo: true }))) return;
-      enviarAcao({ acao: 'remover-interativo' });
+      enviarAcao({ acao: 'remover-interativo', trilha });
     });
     ligarAprovacaoMes(el, { ctx, mes, aoMudar: atualizar });
     ligarCaixinhas();
     el.querySelector('[data-reler-html]')?.addEventListener('click', async () => {
       if (posts.some((p) => p.origem !== 'html') && !(await confirmar('Os conteúdos deste mês serão substituídos pelos que estão no HTML. O que já foi marcado como aprovado, gravado ou postado continua marcado.', { botao: 'Ler de novo' }))) return;
-      const novo = await lerPostsDoHtml(ctx, mes);
+      const novo = await lerPostsDoHtml(ctx, mes, trilha);
       if (novo) atualizar(novo);
     });
     el.querySelector('[data-comentar-mes]')?.addEventListener('click', async () => {
@@ -169,9 +204,13 @@ export async function render(el, ctx) {
   // Caixinhas Feito/Publicado/Usada do HTML <-> andamento salvo no portal.
   let ouvinte;
   let filaMarcacoes = Promise.resolve();
+  // As chaves do cronograma da Vie são guardadas com o prefixo "vie:"; o HTML não sabe disso.
   function estadoCaixinhas() {
-    const feitos = { ...(doc.marcasHtml || {}) };
-    (doc.posts || []).forEach((p) => { if (p.chaveHtml) feitos[p.chaveHtml] = p.status === 'postado'; });
+    const prefixo = trilha === 'vie' ? 'vie:' : '';
+    const doHtml = (k) => (prefixo ? k.startsWith(prefixo) : !k.startsWith('vie:'));
+    const feitos = {};
+    Object.entries(doc.marcasHtml || {}).forEach(([k, v]) => { if (doHtml(k)) feitos[k.slice(prefixo.length)] = v; });
+    (doc.posts || []).forEach((p) => { if (p.chaveHtml && doHtml(p.chaveHtml)) feitos[p.chaveHtml.slice(prefixo.length)] = p.status === 'postado'; });
     return feitos;
   }
   function ligarCaixinhas() {
@@ -184,7 +223,12 @@ export async function render(el, ctx) {
       if (e.data.tipo === 'vie-pronto') {
         quadro.contentWindow.postMessage({ tipo: 'vie-estado', feitos: estadoCaixinhas() }, '*');
       } else if (e.data.tipo === 'vie-marcar') {
-        const corpo = { acao: 'marcar-html', chave: String(e.data.chave), feito: !!e.data.feito };
+        // O cronograma da Vie é marcado pela equipe; para o cliente a caixinha volta como estava.
+        if (trilha === 'vie' && !admin) {
+          quadro.contentWindow.postMessage({ tipo: 'vie-estado', feitos: estadoCaixinhas() }, '*');
+          return;
+        }
+        const corpo = { acao: 'marcar-html', chave: String(e.data.chave), feito: !!e.data.feito, trilha };
         // Uma marcação por vez, para cliques rápidos não se sobreporem.
         filaMarcacoes = filaMarcacoes.then(async () => {
           try {
@@ -210,8 +254,8 @@ export async function render(el, ctx) {
 
   function subirHtml() {
     const m = abrirCamada(`
-      <h2>${doc.interativo ? 'Substituir o cronograma' : 'Subir cronograma pronto'}</h2>
-      <p class="muted">Envie o arquivo <b>.html</b> do cronograma de ${esc(nomeDoMes(mes))} (o mesmo que vocês publicariam no Netlify). Ele aparece dentro do portal, só para ${esc(cliente.nome)}.</p>
+      <h2>${arquivoDaTrilha() ? 'Substituir o cronograma' : 'Subir cronograma pronto'}${separado ? `<small class="muted" style="display:block;font-size:14px;margin-top:4px">${nomeTrilha[trilha]}</small>` : ''}</h2>
+      <p class="muted">Envie o arquivo <b>.html</b> ${separado ? (trilha === 'vie' ? 'com o que a Vie vai produzir e publicar' : 'com o que o cliente vai gravar e postar') : 'do cronograma'} em ${esc(nomeDoMes(mes))} (o mesmo que vocês publicariam no Netlify). Ele aparece dentro do portal, só para ${esc(cliente.nome)}.</p>
       <label class="campo"><span>Arquivo HTML (até 4 MB)</span><input class="entrada" type="file" accept=".html,.htm,text/html"></label>
       <p class="muted" style="font-size:13px">Precisa ser um arquivo único. Imagens podem estar dentro do HTML ou em links externos. Se o mês já tinha sido aprovado, a nova versão volta a esperar a aprovação do cliente.</p>
       <div class="rodape-modal"><button class="btn claro" data-fechar>Cancelar</button><button class="btn acc" data-ok>Enviar</button></div>`);
@@ -221,11 +265,11 @@ export async function render(el, ctx) {
       if (f.size > 4 * 1024 * 1024) return aviso('Arquivo acima de 4 MB. Deixe as imagens em links externos ou comprima-as.', { erro: true });
       ev.target.disabled = true;
       try {
-        atualizar(await api(`cronograma?cliente=${id}&mes=${mes}&interativo=1&nome=${encodeURIComponent(f.name)}`, { metodo: 'POST', arquivo: f }));
+        atualizar(await api(`cronograma?cliente=${id}&mes=${mes}&interativo=1&trilha=${trilha}&nome=${encodeURIComponent(f.name)}`, { metodo: 'POST', arquivo: f }));
         visao = 'interativo';
         m.fechar();
         aviso(doc.status === 'publicado' ? 'Cronograma atualizado. O cliente já vê a nova versão.' : 'Cronograma enviado. Confira e clique em “Liberar para o cliente”.');
-        avisarLeitura(doc);
+        avisarLeitura(doc, trilha);
         ctx.atualizarContadores();
         desenhar();
       } catch (err) {
@@ -236,13 +280,17 @@ export async function render(el, ctx) {
   }
 
   function interativo() {
-    const src = `/api/cronograma?cliente=${id}&mes=${mes}&interativo=1&v=${encodeURIComponent(doc.interativo.enviadoEm)}`;
+    const arquivo = arquivoDaTrilha();
+    const src = `/api/cronograma?cliente=${id}&mes=${mes}&interativo=1&trilha=${trilha}&v=${encodeURIComponent(arquivo.enviadoEm)}`;
     const conversa = doc.conversa || [];
-    const l = doc.leituraHtml;
+    const l = leituraDaTrilha();
+    const marcarTexto = admin ? 'O que for marcado como Feito, Publicado ou Usada no cronograma atualiza a visão geral.'
+      : trilha === 'vie' ? 'A equipe Vie marca aqui o que já foi publicado.'
+        : 'Marque Feito e Publicado aqui no cronograma: a equipe Vie acompanha pela visão geral.';
     return `
       <div class="cartao" style="margin-bottom:16px;display:grid;gap:14px">
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-          <span class="muted" style="font-size:13px">Versão enviada em ${esc(quando(doc.interativo.enviadoEm))}${admin && l ? ` · ${l.total} ${l.total === 1 ? 'conteúdo lido' : 'conteúdos lidos'} para o acompanhamento` : ''}${admin && !l ? ' · os posts ainda não foram lidos para o acompanhamento' : ''}. ${admin ? 'O que for marcado como Feito, Publicado ou Usada no cronograma atualiza a visão geral.' : 'Marque Feito e Publicado aqui no cronograma: a equipe Vie acompanha pela visão geral.'}</span>
+          <span class="muted" style="font-size:13px">Versão enviada em ${esc(quando(arquivo.enviadoEm))}${admin && l ? ` · ${l.total} ${l.total === 1 ? 'conteúdo lido' : 'conteúdos lidos'} para o acompanhamento` : ''}${admin && !l ? ' · os posts ainda não foram lidos para o acompanhamento' : ''}. ${marcarTexto}</span>
           <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
             ${admin ? `<button class="btn claro peq" data-reler-html>${l ? 'Ler os posts de novo' : 'Ler os posts do HTML'}</button>` : ''}
             <a class="btn claro peq" href="${src}" target="_blank" rel="noopener">${icones.link}Abrir em tela cheia</a>
@@ -256,7 +304,7 @@ export async function render(el, ctx) {
           <button class="btn claro" data-comentar-mes>Enviar</button>
         </div>
       </div>
-      <iframe class="quadro-interativo" data-html-cronograma src="${src}&portal=1" title="Cronograma interativo de ${esc(nomeDoMes(mes))}"
+      <iframe class="quadro-interativo" data-html-cronograma src="${src}&portal=1" title="${separado ? nomeTrilha[trilha] : 'Cronograma interativo'} de ${esc(nomeDoMes(mes))}"
         sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms allow-modals allow-downloads"></iframe>`;
   }
 

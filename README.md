@@ -8,7 +8,7 @@ O portal reúne **todos os clientes da Vie**. Cada cliente recebe as etiquetas d
 
 | Serviço | Abas |
 |---|---|
-| Gestão de Instagram | Linha editorial, Cronograma, Aprovação, Banco de ideias, Evolução do perfil, Métricas |
+| Gestão de Instagram | Linha editorial, Cronograma (dividido: da Vie e do cliente), Aprovação, Banco de ideias, Evolução do perfil, Métricas |
 | Produção de vídeo | Cronograma, Aprovação, Banco de ideias |
 | Gestão de tráfego | Métricas, Evolução do perfil |
 | Consultoria editorial | Linha editorial, Cronograma, Aprovação, Banco de ideias, Evolução do perfil, Métricas |
@@ -29,6 +29,17 @@ Nome, cor e abas de cada serviço são editados em **Serviços**, no menu da Vie
 | **Acessos** | Gera links de convite (copiar ou enviar pelo WhatsApp) e remove acessos | — |
 
 **Isolamento entre clientes:** toda checagem de permissão acontece no servidor (`lib/base.js → exigirAcessoCliente`). Um cliente só consegue ler os dados do próprio cliente, não vê meses em rascunho nem as notas internas da Vie. Os arquivos nunca ficam com link público: o download passa pela API, que confere quem está pedindo.
+
+### Cronograma da Vie e cronograma do cliente
+
+Na Gestão de Instagram, o Cronograma tem duas partes, uma ao lado da outra no topo da página:
+
+- **Cronograma da Vie**: o que a equipe produz e publica.
+- **Cronograma do cliente** (para o cliente, **Seu cronograma**): o que ele grava e posta.
+
+Cada parte tem o próprio HTML (**Subir cronograma pronto** com a parte escolhida), a própria leitura dos posts e as próprias caixinhas. As caixinhas do cronograma da Vie são marcadas só pela equipe; o cliente vê o que já foi publicado. A aprovação do mês e a liberação valem para as duas partes juntas. A visão geral soma tudo e mostra em cada conteúdo quem faz: **Vie publica** ou **Você**.
+
+A divisão é a opção “Cronograma da Vie separado” em **Serviços**. Ela vem marcada na Gestão de Instagram e pode ser ligada em qualquer outro serviço.
 
 ### Linha editorial em PDF
 

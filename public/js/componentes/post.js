@@ -16,6 +16,13 @@ export function etiquetaStatus(status) {
   return `<span class="etq" style="--cor:${s.cor}"><span class="ponto"></span>${s.nome}</span>`;
 }
 
+// Quem cuida do conteúdo quando o cronograma é dividido entre a Vie e o cliente.
+export function etiquetaTrilha(p, admin) {
+  return p.trilha === 'vie'
+    ? '<span class="etq trilha-vie">Vie publica</span>'
+    : `<span class="etq trilha-cliente">${admin ? 'Cliente' : 'Você'}</span>`;
+}
+
 const rotaCron = (ctx, mes) => `cronograma?cliente=${encodeURIComponent(ctx.cliente.id)}&mes=${mes}`;
 
 // Abre a gaveta. `aoMudar(doc)` recebe o cronograma atualizado depois de qualquer alteração.
@@ -35,7 +42,7 @@ export async function abrirPost({ ctx, mes, post, aoMudar, editar = false }) {
   function mostrar() {
     const p = atual;
     el.querySelector('.cab-gaveta').innerHTML = `
-      ${etiquetaFormato(p.formato)} ${etiquetaPilar(pilares, p.pilarId)}
+      ${etiquetaFormato(p.formato)} ${etiquetaPilar(pilares, p.pilarId)}${ctx.abas?.has('cronogramaVie') ? ` ${etiquetaTrilha(p, ctx.admin)}` : ''}
       <span style="margin-left:auto"></span>
       ${ctx.admin ? `<button class="btn-icone" data-editar title="Editar">${icones.editar}</button>` : ''}
       <button class="btn-icone" data-fechar title="Fechar">${icones.fechar}</button>`;
@@ -43,8 +50,9 @@ export async function abrirPost({ ctx, mes, post, aoMudar, editar = false }) {
     if (['pauta', 'aprovacao', 'ajuste'].includes(p.status)) {
       acoesCliente.push('<button class="btn acc" data-status="aprovado">Aprovar</button>', '<button class="btn claro" data-ajuste>Pedir ajuste</button>');
     }
-    if (p.status === 'aprovado') acoesCliente.push('<button class="btn claro" data-status="gravado">Marcar como gravado</button>');
-    if (['aprovado', 'gravado'].includes(p.status)) acoesCliente.push('<button class="btn claro" data-status="postado">Marcar como postado</button>');
+    // No cronograma da Vie quem grava e publica é a equipe: o cliente só aprova ou pede ajuste.
+    if (p.trilha !== 'vie' && p.status === 'aprovado') acoesCliente.push('<button class="btn claro" data-status="gravado">Marcar como gravado</button>');
+    if (p.trilha !== 'vie' && ['aprovado', 'gravado'].includes(p.status)) acoesCliente.push('<button class="btn claro" data-status="postado">Marcar como postado</button>');
 
     el.querySelector('.corpo').innerHTML = `
       <div>
@@ -189,7 +197,7 @@ export async function abrirPost({ ctx, mes, post, aoMudar, editar = false }) {
       });
       const novo = { ...p, ...dados, referencias, ideiaId, id: p.id || undefined };
       try {
-        const doc = await enviar({ acao: 'salvar-post', post: novo });
+        const doc = await enviar({ acao: 'salvar-post', post: novo, trilha: p.trilha });
         if (ideiaId && !ideias.find((i) => i.id === ideiaId)?.usadaEm) {
           const ideia = ideias.find((i) => i.id === ideiaId);
           ctx.definirIdeias(await api(`ideias?cliente=${encodeURIComponent(ctx.cliente.id)}`, { metodo: 'POST', corpo: { acao: 'salvar', ideia: { ...ideia, usadaEm: mes } } }));
