@@ -2,7 +2,7 @@
 import { api, esc, aviso, falhou, abrirCamada, lerCampos, icones, iniciais } from './ui.js';
 import { etiquetasServicos } from './componentes/servicos.js';
 import { iniciarApp, paginaInstalar, abrirComoInstalar, mostrarInstalar, aoMudarInstalacao, jaInstalado } from './instalar.js';
-import { situacao as situacaoAvisos, ativar as ativarAvisos, desativar as desativarAvisos, testar as testarAvisos } from './notificacoes.js';
+import { situacao as situacaoAvisos, ativar as ativarAvisos, desativar as desativarAvisos, testar as testarAvisos, MOTIVOS } from './notificacoes.js';
 
 const estado = { usuario: null, clienteProprio: null, clientes: null, servicos: null, cache: {} };
 const app = document.getElementById('app');
@@ -226,10 +226,9 @@ function moldura({ marcaHtml, menuHtml, titulo }) {
   mostrar();
   const parar = aoMudarInstalacao(() => (document.body.contains(instalar) ? mostrar() : parar()));
   const botaoAvisos = app.querySelector('[data-ativar-avisos]');
-  situacaoAvisos().then((s) => { botaoAvisos.hidden = !['desligado', 'instalar'].includes(s); }).catch(() => {});
-  botaoAvisos.onclick = async () => {
-    if (await ligarAvisos()) botaoAvisos.hidden = true;
-  };
+  // Aparece sempre que as notificações não estão ativas: tocar explica o que falta.
+  situacaoAvisos().then((s) => { botaoAvisos.hidden = s === 'ativo'; }).catch(() => {});
+  botaoAvisos.onclick = () => ligarAvisos().then((ok) => { if (ok) botaoAvisos.hidden = true; });
   return app.querySelector('#conteudo');
 }
 
@@ -375,25 +374,25 @@ async function sair() {
   location.hash = '#/login';
 }
 
-// Liga as notificações neste aparelho (no iPhone, só com o app instalado).
-async function ligarAvisos() {
-  const s = await situacaoAvisos();
-  if (s === 'instalar') {
-    aviso('No iPhone, as notificações chegam pelo app: instale o portal na tela de início e ative por lá.');
-    abrirComoInstalar();
-    return false;
-  }
-  if (s === 'bloqueado') { aviso('As notificações estão bloqueadas para o portal. Libere nas configurações do celular ou do navegador.', { erro: true }); return false; }
-  if (s === 'sem-suporte') { aviso('Este navegador não recebe notificações.', { erro: true }); return false; }
-  try {
-    await ativarAvisos();
-    await testarAvisos().catch(() => {});
-    aviso('Notificações ativadas neste aparelho.');
-    return true;
-  } catch (err) {
-    falhou(err);
-    return false;
-  }
+// Liga as notificações neste aparelho. Precisa ser chamada direto no toque, sem
+// esperar nada antes: o iPhone ignora o pedido de permissão que não sai do toque.
+function ligarAvisos() {
+  return ativarAvisos()
+    .then(async () => {
+      await testarAvisos().catch(() => {});
+      aviso('Notificações ativadas neste aparelho.');
+      return true;
+    })
+    .catch((err) => {
+      if (err.motivo === 'instalar') { abrirComoInstalar(); aviso(err.message); return false; }
+      // Janela com o motivo (e o detalhe técnico), para dar para mandar print à Vie.
+      abrirCamada(`
+        <h2>Não deu para ativar</h2>
+        <p>${esc(err.message)}</p>
+        ${err.detalhe ? `<p class="muted" style="font-size:12px">Detalhe para a equipe Vie: ${esc(err.detalhe)} · ${esc(navigator.userAgent)}</p>` : ''}
+        <div class="rodape-modal"><button class="btn acc" data-fechar>Entendi</button></div>`);
+      return false;
+    });
 }
 
 function minhaConta() {
@@ -415,14 +414,16 @@ function minhaConta() {
   const textos = {
     ativo: ['Notificações ativadas neste aparelho.', '<button class="btn claro peq" data-testar>Enviar teste</button><button class="btn fantasma peq" data-desligar>Desativar</button>'],
     desligado: ['Receba no celular os avisos do portal: o que gravar no dia e o que está esperando aprovação.', '<button class="btn acc peq" data-ligar>Ativar notificações</button>'],
-    instalar: ['No iPhone, as notificações chegam pelo app instalado na tela de início.', '<button class="btn acc peq" data-ligar>Como instalar</button>'],
-    bloqueado: ['As notificações estão bloqueadas para o portal neste aparelho. Libere nas configurações do celular ou do navegador.', ''],
-    'sem-suporte': ['Este navegador não recebe notificações.', ''],
+    instalar: [MOTIVOS.instalar, '<button class="btn acc peq" data-ligar>Como instalar</button>'],
+    bloqueado: [MOTIVOS.bloqueado, '<button class="btn claro peq" data-ligar>Tentar de novo</button>'],
+    embutido: [MOTIVOS.embutido, ''],
+    'ios-antigo': [MOTIVOS['ios-antigo'], ''],
+    'sem-suporte': [MOTIVOS['sem-suporte'], ''],
   };
   const desenharAvisos = async () => {
     const [texto, botoes] = textos[await situacaoAvisos().catch(() => 'sem-suporte')];
     caixa.innerHTML = `<b>Notificações</b><p class="muted" style="font-size:13.5px">${texto}</p>${botoes ? `<div style="display:flex;gap:8px;flex-wrap:wrap">${botoes}</div>` : ''}`;
-    caixa.querySelector('[data-ligar]')?.addEventListener('click', async () => { await ligarAvisos(); desenharAvisos(); });
+    caixa.querySelector('[data-ligar]')?.addEventListener('click', () => { ligarAvisos().then(desenharAvisos); });
     caixa.querySelector('[data-testar]')?.addEventListener('click', async () => {
       try { await testarAvisos(); aviso('Notificação de teste enviada.'); } catch (err) { falhou(err); }
     });
