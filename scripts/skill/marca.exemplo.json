@@ -1,0 +1,29 @@
+{
+  "empresa": "Lume Studio",
+  "marca": "Lume",
+  "genero": "o",
+  "portal": "Portal do Cliente",
+  "nicho": "Marketing para restaurantes",
+  "frase_login": "O marketing do seu restaurante, mês a mês, em um só lugar.",
+  "resultado": "Novos pedidos",
+  "nome_admin": "Carol",
+  "email": "contato@lumestudio.com.br",
+  "dominio": "portal.lumestudio.com.br",
+  "cores": {
+    "principal": "#2f6b4f",
+    "escura": "#14231c",
+    "clara": "#e8f0d8",
+    "fundo": "#eef0ea"
+  },
+  "fontes": {
+    "titulo": "Playfair Display",
+    "google_titulo": "Playfair Display",
+    "texto": "Inter",
+    "google_texto": "Inter"
+  },
+  "logos": {
+    "clara": "",
+    "escura": "",
+    "icone": ""
+  }
+}

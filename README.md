@@ -161,6 +161,18 @@ npm run dev
 
 Abre em `http://localhost:3000` com o login `admin@vie.local` / `vie12345`. Nesse modo os dados ficam só na memória e somem ao reiniciar.
 
+## Copiar o portal para outra empresa (skill)
+
+O portal vira uma skill do Claude que monta o mesmo portal para outra empresa, com nome, cores, fontes, logos e textos do nicho dela:
+
+```bash
+python3 scripts/gerar-skill.py   # gera dist/portal-assessoria.zip
+```
+
+- O código vira um modelo com marcadores (`{{EMPRESA}}`, `{{COR_PRINCIPAL}}`…); o `scripts/personalizar.py` da skill preenche com o `marca.json` da empresa nova e gera logos e ícones do app.
+- As instruções da skill ficam em `scripts/skill/` (SKILL.md, referências, script e exemplo de marca.json). Edite lá e gere de novo.
+- Rode o gerador sempre que o portal mudar, para a skill levar a versão nova. Ele avisa se sobrou algo da Vie no modelo.
+
 ## Próximos passos possíveis
 
 - Puxar as métricas direto do Instagram (Meta Graph API).
