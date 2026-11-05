@@ -1,6 +1,5 @@
 import { handler, metodo, HttpError, getRedis, keys, iguaisSeguro } from '../lib/base.js';
-import { chavesVapid, inscricaoValida, inscrever, cancelar, avisar, avisarCliente, avisarEquipe, emailsDoCliente } from '../lib/push.js';
-import { enviarEmail } from '../lib/email.js';
+import { chavesVapid, inscricaoValida, inscrever, cancelar, avisar, avisarCliente, avisarEquipe } from '../lib/push.js';
 import { temInterativo } from './cronograma.js';
 import { nomeDoMes } from '../public/js/regras.js';
 
@@ -11,8 +10,7 @@ export default handler(async (req, res, usuario) => {
 
   if (req.query.rotina) {
     if (!chamadaDoAgendamento(req)) throw new HttpError(401, 'Só o agendamento da Vercel chama esta rotina.');
-    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '');
-    return res.status(200).json(await rotinaDoDia(host ? `https://${host}` : ''));
+    return res.status(200).json(await rotinaDoDia());
   }
   if (!usuario) throw new HttpError(401, 'Faça login para continuar.');
 
@@ -50,7 +48,6 @@ const somarMes = (mes, n) => {
   const d = new Date(Date.UTC(a, m - 1 + n, 1));
   return d.toISOString().slice(0, 7);
 };
-const EMPRESA = 'Vie Company';
 const DIAS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 const dataPorExtenso = (iso) => {
   const [a, m, d] = iso.split('-').map(Number);
@@ -60,7 +57,7 @@ const lista = (itens) => (itens.length > 1 ? `${itens.slice(0, -1).join(', ')} e
 const aspas = (t) => `“${String(t || '').slice(0, 60)}${String(t || '').length > 60 ? '…' : ''}”`;
 
 // Uma vez por dia (de manhã): o que o cliente grava hoje e o que está esperando aprovação.
-export async function rotinaDoDia(portal = '') {
+export async function rotinaDoDia() {
   const redis = getRedis();
   const hoje = hojeEmSaoPaulo();
   // Mesmo que o agendamento rode duas vezes, os avisos saem uma vez só.
@@ -83,22 +80,12 @@ export async function rotinaDoDia(portal = '') {
     if (reels.length) enviados += await avisarCliente(c.id, { titulo: 'Grave o reels de hoje 🎥', corpo: lista(reels.map((p) => aspas(p.titulo))), url: `${base}/cronograma/${mes}`, tag: `reels-${hoje}` });
     if (feed.length) enviados += await avisarCliente(c.id, { titulo: 'Hoje tem post no seu cronograma', corpo: lista(feed.map((p) => aspas(p.titulo))), url: `${base}/cronograma/${mes}`, tag: `feed-${hoje}` });
 
-    // Véspera da produção de conteúdo: aviso no app e por e-mail para o cliente, e no app da equipe.
+    // Véspera da produção de conteúdo: aviso no app do cliente e da equipe.
     const producoes = (await redis.get(keys.producoes(c.id))) || [];
     const deAmanha = producoes.filter((p) => p.data === amanha && p.lembrete !== amanha);
     for (const p of deAmanha) {
       const quando = [dataPorExtenso(p.data), p.hora ? `às ${p.hora.replace(':00', 'h').replace(':', 'h')}` : ''].filter(Boolean).join(' ');
-      enviados += await avisarCliente(c.id, { titulo: 'Amanhã é o dia da sua produção de conteúdo! 📸', corpo: [quando, p.local].filter(Boolean).join(' · '), url: base, tag: `producao-${p.id}` });
-      enviados += await enviarEmail(await emailsDoCliente(c.id), {
-        empresa: EMPRESA,
-        assunto: 'Amanhã é o dia da sua produção de conteúdo!',
-        titulo: 'Amanhã é o dia da sua produção de conteúdo! 📸',
-        saudacao: `Oi! Passando para lembrar da produção de conteúdo de ${c.nome}.`,
-        texto: 'Separe os looks e o que combinamos no moodboard. Qualquer dúvida, é só chamar a equipe.',
-        linhas: [['Quando', quando], ['Local', p.local], ['Observações', p.observacoes]],
-        botao: 'Ver no portal',
-        link: portal ? `${portal}${base}` : '',
-      });
+      enviados += await avisarCliente(c.id, { titulo: 'Amanhã é o dia da sua produção de conteúdo! 📸', corpo: [quando, p.local, p.observacoes].filter(Boolean).join(' · '), url: base, tag: `producao-${p.id}` });
       await avisarEquipe({ titulo: `Amanhã: produção de ${c.nome}`, corpo: [quando, p.local].filter(Boolean).join(' · '), url: base }, c.id);
       p.lembrete = amanha;
     }

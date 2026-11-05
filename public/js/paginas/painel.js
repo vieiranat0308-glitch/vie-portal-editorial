@@ -251,8 +251,7 @@ export async function render(el, ctx) {
       const futuras = producoes.filter((p) => p.data >= hoje);
       caixa.innerHTML = `
         <h2>Produções de ${esc(cliente.nome)}</h2>
-        <p class="muted">A próxima aparece na visão geral do cliente. Na véspera, ele recebe “Amanhã é o dia da sua produção de conteúdo!” no app${agenda.emailConfigurado ? ' e por e-mail' : ''}.</p>
-        ${agenda.emailConfigurado ? '' : '<p class="aviso-email">O lembrete por e-mail ainda não está ligado: falta configurar o e-mail de envio (SMTP) na Vercel. O aviso no app já funciona.</p>'}
+        <p class="muted">A próxima aparece na visão geral do cliente. Na véspera, ele recebe no app “Amanhã é o dia da sua produção de conteúdo!”.</p>
         <div style="display:grid;gap:8px;margin:14px 0">${futuras.length ? futuras.map((p) => `
           <div class="pessoa">
             <div class="dados"><b style="font-weight:500">${esc(dataLonga(p.data))}${p.hora ? ` · ${esc(p.hora)}` : ''}</b><div class="muted" style="font-size:13px">${esc([p.local, p.observacoes].filter(Boolean).join(' · ') || 'Sem local')}</div></div>

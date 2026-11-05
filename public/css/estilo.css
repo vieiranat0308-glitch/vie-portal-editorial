@@ -640,7 +640,6 @@ textarea.entrada { resize: vertical; min-height: 84px; line-height: 1.5; }
 .producao-falta { font-size: 16px; display: block; }
 .cartao-producao.perto { border-color: var(--acc); box-shadow: 0 0 0 2px color-mix(in srgb, var(--acc) 25%, transparent); }
 .link-producao { display: inline-block; margin-top: 12px; font-size: 13.5px; color: var(--acc); font-weight: 500; }
-.aviso-email { background: color-mix(in srgb, var(--s-aprovacao) 14%, var(--card)); border-radius: 12px; padding: 10px 14px; font-size: 13.5px; margin-top: 10px; }
 
 /* Moodboard e calendário sazonal */
 .cartao-moodboard, .cartao-sazonal { display: grid; gap: 12px; }

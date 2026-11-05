@@ -18,7 +18,7 @@
 - **Aprovação**: Aprovado / Alterar em cada conteúdo; num HTML, aprovação do mês inteiro; botão **Aprovar tudo** no topo (conteúdos, HTMLs, moodboards e datas sazonais).
 - **Moodboard** (`api/planejamento.js?tipo=moodboard`): roteiro de gravação em PDF (visor embutido), Word ou link, com aprovação, nova versão e conversa.
 - **Calendário sazonal** (`tipo=sazonal`): datas com ação de marketing para aprovar; sugestões dos próximos 12 meses em `public/js/paginas/sazonal.js → datasSugeridas` (ajuste a lista ao nicho).
-- **Próxima produção** (`tipo=producao`): cartão na visão geral; lembrete na véspera no app e por e-mail (`lib/email.js`, SMTP).
+- **Próxima produção** (`tipo=producao`): cartão na visão geral; lembrete na véspera no app (push).
 - **Banco de ideias**, **Evolução do perfil** (perfil inicial + acompanhamento com prints), **Métricas** (mês a mês, leitura da agência), **Documentos** (PDF/imagem até 4 MB ou links).
 - **Acessos**: convites por link de 7 dias (copiar ou WhatsApp).
 

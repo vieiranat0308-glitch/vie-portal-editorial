@@ -3,7 +3,6 @@ import {
 } from '../lib/base.js';
 import { salvarArquivo, lerArquivo, apagarArquivo } from '../lib/arquivos.js';
 import { avisarCliente, avisarEquipe } from '../lib/push.js';
-import { emailConfigurado } from '../lib/email.js';
 
 // Planejamento das produções de cada cliente, numa função só (a Vercel gratuita
 // permite até 12): tipo=moodboard (roteiros de gravação em PDF/Word para aprovar),
@@ -38,7 +37,7 @@ export default handler(async (req, res, usuario) => {
     await redis.set(chave(clienteId), lista);
   };
   const paraQuem = (itens) => (admin ? itens : itens.map(({ notaInterna, ...i }) => i));
-  const responder = () => res.status(200).json(tipo === 'producao' ? { itens: lista, emailConfigurado: emailConfigurado() } : paraQuem(lista));
+  const responder = () => res.status(200).json(tipo === 'producao' ? { itens: lista } : paraQuem(lista));
 
   if (req.method === 'GET') {
     // Arquivo do moodboard: só se pertence a este cliente.
