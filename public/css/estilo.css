@@ -623,3 +623,38 @@ textarea.entrada { resize: vertical; min-height: 84px; line-height: 1.5; }
 .escolha-clientes .bolinha { width: 9px; height: 9px; border-radius: 50%; background: var(--cor); flex: none; }
 .acesso-clientes { font-size: 12.5px; color: var(--acc); margin-top: 2px; }
 .cartao-avisos { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); margin: 6px 0 14px; }
+
+/* Aprovar tudo de uma vez */
+.faixa-aprovar-tudo { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: space-between; padding: 16px 20px; border-radius: var(--r); background: var(--card); border: 1px solid var(--line); margin: 16px 0 6px; }
+.faixa-aprovar-tudo.destaque { background: var(--choc); color: var(--creme); border-color: var(--choc); margin-top: 0; }
+.faixa-aprovar-tudo.destaque b { color: #fff; font-size: 16px; }
+.faixa-aprovar-tudo .btn { min-width: 190px; justify-content: center; }
+
+/* Próxima produção (visão geral) */
+.cartao-producao .cab h3 { display: flex; gap: 8px; align-items: center; }
+.cartao-producao .cab h3 svg { width: 18px; height: 18px; color: var(--acc); }
+.producao-linha { display: flex; gap: 14px; align-items: center; }
+.producao-data { display: grid; place-items: center; width: 58px; height: 62px; flex: none; border-radius: 14px; background: var(--acc); color: #fff; line-height: 1; }
+.producao-data b { font: 500 26px var(--serif); }
+.producao-data small { font: 400 10px var(--mono); text-transform: uppercase; letter-spacing: .1em; opacity: .85; }
+.producao-falta { font-size: 16px; display: block; }
+.cartao-producao.perto { border-color: var(--acc); box-shadow: 0 0 0 2px color-mix(in srgb, var(--acc) 25%, transparent); }
+.link-producao { display: inline-block; margin-top: 12px; font-size: 13.5px; color: var(--acc); font-weight: 500; }
+.aviso-email { background: color-mix(in srgb, var(--s-aprovacao) 14%, var(--card)); border-radius: 12px; padding: 10px 14px; font-size: 13.5px; margin-top: 10px; }
+
+/* Moodboard e calendário sazonal */
+.cartao-moodboard, .cartao-sazonal { display: grid; gap: 12px; }
+.cab-moodboard { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.texto-moodboard { font-size: 14.5px; white-space: pre-line; background: var(--surface); border-radius: 12px; padding: 12px 14px; }
+.cartao-sazonal { grid-template-columns: 62px minmax(0, 1fr); align-items: start; }
+.cartao-sazonal.passou { opacity: .6; }
+.data-sazonal { display: grid; place-items: center; height: 64px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); line-height: 1; }
+.data-sazonal b { font: 500 26px var(--serif); }
+.data-sazonal small { font: 400 10px var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.corpo-sazonal { display: grid; gap: 10px; min-width: 0; }
+.conversa-item summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.conversa-item[open] { display: grid; gap: 8px; }
+.lista-sugestoes { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; max-height: 50vh; overflow-y: auto; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); margin: 12px 0; }
+.lista-sugestoes label { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.lista-sugestoes .mono { font-size: 11px; color: var(--muted); }
+@media (max-width: 560px) { .cartao-sazonal { grid-template-columns: 52px minmax(0, 1fr); } .faixa-aprovar-tudo .btn { width: 100%; } }

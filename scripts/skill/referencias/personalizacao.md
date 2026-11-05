@@ -8,6 +8,9 @@ O `personalizar.py` já troca nome, artigos, cores, fontes, logos, ícones e os 
 - Assessoria de imprensa: troque abas que não fazem sentido (ex.: sem `evolucao`).
 Ids só com letras minúsculas, números e hífen. A divisão do cronograma (`cronogramaVie`) costuma ficar no serviço de gestão de redes.
 
+## Datas sazonais sugeridas
+`public/js/paginas/sazonal.js → datasSugeridas`: a lista mistura datas comerciais e da saúde. Para outro nicho, troque as datas da saúde (Dia do Médico, Outubro Rosa…) pelas do setor (ex.: Dia do Cozinheiro, Dia da Pizza).
+
 ## Cliente de exemplo
 `lib/exemplo.js` cria um cliente de demonstração (uma médica, com linha editorial, ideias, métricas e evolução). Para outro nicho, reescreva os textos (objetivo, pilares, bio, ideias) com um caso do nicho novo, ou mantenha e avise que é só para testar.
 

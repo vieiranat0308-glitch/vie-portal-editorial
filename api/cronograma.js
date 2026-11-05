@@ -211,6 +211,14 @@ export default handler(async (req, res, usuario) => {
       break;
     }
 
+    // "Aprovar tudo": todos os conteúdos do mês que estão esperando aprovação.
+    case 'aprovar-todos': {
+      if (!admin && doc.status !== 'publicado') throw new HttpError(403, 'Este cronograma ainda não foi liberado.');
+      doc.posts.forEach((p) => { if (p.status === 'aprovacao' && p.origem !== 'html') { p.status = 'aprovado'; p.statusPor = assinatura; } });
+      if (temInterativo(doc) && !['aprovado'].includes(doc.aprovacaoMes?.status)) doc.aprovacaoMes = { status: 'aprovado', ...assinatura };
+      break;
+    }
+
     case 'comentar-mes': {
       if (!admin && doc.status !== 'publicado') throw new HttpError(403, 'Este cronograma ainda não foi liberado.');
       if (!String(corpo.texto || '').trim()) throw new HttpError(400, 'Escreva o comentário.');
@@ -306,6 +314,7 @@ async function enviarAvisos({ corpo, doc, post, cliente, usuario, admin, mes, es
       : corpo.status === 'ajuste' ? [`${cliente.nome} pediu alteração`, `${titulo(post)}: ${String(corpo.comentario || '').slice(0, 120)}`]
         : null,
     'aprovar-mes': [`${cliente.nome} aprovou o cronograma ✓`, `Cronograma de ${nomeMes} aprovado por ${quem}.`],
+    'aprovar-todos': [`${cliente.nome} aprovou tudo ✓`, `${quem} aprovou tudo o que estava esperando no cronograma de ${nomeMes}.`],
     'ajuste-mes': [`${cliente.nome} pediu alteração no cronograma`, String(corpo.comentario || '').slice(0, 140)],
     comentar: [`Comentário de ${cliente.nome}`, `${titulo(post)}: ${String(corpo.texto || '').slice(0, 120)}`],
     'comentar-mes': [`Comentário de ${cliente.nome}`, String(corpo.texto || '').slice(0, 140)],

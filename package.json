@@ -12,6 +12,7 @@
   "dependencies": {
     "@upstash/redis": "^1.39.0",
     "@vercel/blob": "^2.8.2",
+    "nodemailer": "^6.9.16",
     "web-push": "^3.6.7"
   }
 }

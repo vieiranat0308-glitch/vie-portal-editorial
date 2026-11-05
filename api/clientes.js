@@ -77,10 +77,13 @@ export default handler(async (req, res, usuario) => {
   await Promise.all(evolucao.flatMap((r) => r.prints || []).map(apagarArquivo));
   const editorial = await redis.get(keys.editorial(id));
   if (editorial?.pdf) await apagarArquivo(editorial.pdf.arquivoId);
+  const moodboards = (await redis.get(keys.moodboards(id))) || [];
+  await Promise.all(moodboards.filter((m) => m.arquivo).map((m) => apagarArquivo(m.arquivo.id)));
   const crons = await Promise.all(meses.map((m) => redis.get(keys.cronograma(id, m))));
   await Promise.all(crons.flatMap((c) => [c?.interativo, c?.interativoVie]).filter(Boolean).map((a) => apagarArquivo(a.arquivoId)));
   await redis.del(
     keys.editorial(id), keys.ideias(id), keys.metricas(id), keys.documentos(id), keys.meses(id), keys.evolucao(id),
+    keys.moodboards(id), keys.sazonal(id), keys.producoes(id),
     ...meses.map((m) => keys.cronograma(id, m)),
   );
   if (usuarios.length) await redis.hdel(keys.usuarios, ...usuarios.map((u) => u.email));
@@ -126,30 +129,33 @@ async function resumo(clienteId, mes) {
 
 // Abas do portal que cada serviço libera para o cliente (Visão geral e Documentos aparecem sempre).
 // `cronogramaVie` não é uma aba do menu: divide o Cronograma em “da Vie” e “do cliente”.
-export const ABAS = ['linha', 'cronograma', 'cronogramaVie', 'aprovacao', 'ideias', 'evolucao', 'metricas'];
+export const ABAS = ['linha', 'cronograma', 'cronogramaVie', 'sazonal', 'moodboard', 'aprovacao', 'ideias', 'evolucao', 'metricas'];
+// Consultoria editorial: sem Sazonal e Moodboard (esses são da Gestão de Instagram e da produção de conteúdo).
 const ABAS_CONTEUDO = ['linha', 'cronograma', 'aprovacao', 'ideias', 'evolucao', 'metricas'];
 // Sobe quando surge uma opção nova, para os serviços já salvos receberem o padrão dela.
-const VERSAO_ABAS = 2;
+const VERSAO_ABAS = 3;
+// Abas que chegaram em cada versão: os serviços salvos antes ganham as que o padrão deles tem.
+const NOVAS_ABAS = { 2: ['cronogramaVie'], 3: ['sazonal', 'moodboard'] };
 
 export const SERVICOS_PADRAO = [
-  { id: 'instagram', nome: 'Gestão de Instagram', cor: '#3f6a8a', abas: ['linha', 'cronograma', 'cronogramaVie', 'aprovacao', 'ideias', 'evolucao', 'metricas'] },
-  { id: 'video', nome: 'Produção de vídeo', cor: '#b0813a', abas: ['cronograma', 'aprovacao', 'ideias'] },
+  { id: 'instagram', nome: 'Gestão de Instagram', cor: '#3f6a8a', abas: ['linha', 'cronograma', 'cronogramaVie', 'sazonal', 'moodboard', 'aprovacao', 'ideias', 'evolucao', 'metricas'] },
+  { id: 'video', nome: 'Produção de vídeo', cor: '#b0813a', abas: ['cronograma', 'moodboard', 'aprovacao', 'ideias'] },
   { id: 'trafego', nome: 'Gestão de tráfego', cor: '#4f7a52', abas: ['metricas', 'evolucao'] },
   { id: 'editorial', nome: 'Consultoria editorial', cor: '#8a391b', abas: ABAS_CONTEUDO },
 ];
 
-async function listarServicos() {
+export async function listarServicos() {
   const salvos = await getRedis().get(keys.servicos);
   if (!salvos) return SERVICOS_PADRAO;
   // Serviços salvos antes das abas por serviço: usa o padrão do mesmo serviço ou todas.
   return salvos.map((s) => {
     const padrao = SERVICOS_PADRAO.find((p) => p.id === s.id)?.abas;
     if (!Array.isArray(s.abas)) return { ...s, abas: padrao || ABAS };
-    // Salvos antes do cronograma separado: a Gestão de Instagram ganha a divisão.
-    if (s.versao !== VERSAO_ABAS && padrao?.includes('cronogramaVie') && s.abas.includes('cronograma') && !s.abas.includes('cronogramaVie')) {
-      return { ...s, abas: [...s.abas, 'cronogramaVie'] };
-    }
-    return s;
+    if (!padrao || (s.versao || 1) >= VERSAO_ABAS) return s;
+    // Salvos numa versão anterior: ganham as abas novas que o serviço padrão tem.
+    const novas = Object.entries(NOVAS_ABAS).filter(([v]) => Number(v) > (s.versao || 1)).flatMap(([, abas]) => abas)
+      .filter((a) => padrao.includes(a) && !s.abas.includes(a) && (a !== 'cronogramaVie' || s.abas.includes('cronograma')));
+    return novas.length ? { ...s, abas: [...s.abas, ...novas] } : s;
   });
 }
 

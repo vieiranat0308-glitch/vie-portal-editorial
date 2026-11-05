@@ -1,5 +1,5 @@
 // Visão geral de um cliente: saudação, números do mês, calendário e próximos conteúdos.
-import { api, esc, falhou, hojeISO, mesAtual, somarMes, saudacao, diaSemanaCurto, dataLonga, compacto, num, icones } from '../ui.js';
+import { api, esc, aviso, falhou, abrirCamada, confirmar, hojeISO, mesAtual, somarMes, saudacao, diaSemanaCurto, dataLonga, dataObj, compacto, num, icones } from '../ui.js';
 import { FORMATOS, STATUS, nomeDoMes, corDoPilar } from '../regras.js';
 import { linhaSuave, miniCalendario } from '../componentes/graficos.js';
 import { abrirPost, etiquetaFormato, etiquetaStatus, etiquetaTrilha } from '../componentes/post.js';
@@ -18,7 +18,12 @@ export async function render(el, ctx) {
     ? `<button class="btn" data-novo><span>Novo conteúdo</span><span class="mais">+</span></button>`
     : `<a class="btn claro" href="#${ctx.base}/ideias">${icones.ideia}Sugerir ideia</a>`);
 
-  const [editorial, metricas] = await Promise.all([ctx.editorial(), api(`metricas?cliente=${id}`)]);
+  const [editorial, metricas, agenda] = await Promise.all([
+    ctx.editorial(),
+    api(`metricas?cliente=${id}`),
+    api(`planejamento?cliente=${id}&tipo=producao`).catch(() => ({ itens: [] })),
+  ]);
+  let producoes = agenda.itens || [];
   const pilares = editorial.pilares || [];
   let doc = await api(`cronograma?cliente=${id}&mes=${mes}`);
 
@@ -145,6 +150,7 @@ export async function render(el, ctx) {
         </div>
 
         <div class="coluna">
+          ${cartaoProducao()}
           <div class="cartao" data-cal></div>
           ${separado ? '' /* Gestão de Instagram: o dia a dia está nas listas "produzir" e "a Vie vai publicar" */ : `<div class="cartao">
             <div class="cab"><h3>${selecionado === hoje ? 'Hoje' : esc(dataLonga(selecionado))}</h3><span class="mono">Feed e stories</span></div>
@@ -156,6 +162,7 @@ export async function render(el, ctx) {
       </div>`;
 
     ligarAprovacaoMes(el, { ctx, mes, aoMudar: (d) => { doc = d; desenhar(); } });
+    el.querySelector('[data-producoes]')?.addEventListener('click', agendarProducoes);
     miniCalendario(el.querySelector('[data-cal]'), {
       mes,
       posts,
@@ -208,6 +215,76 @@ export async function render(el, ctx) {
         vazio: daTrilha('vie').length ? 'Tudo publicado neste mês. ✓' : 'O cronograma da Vie deste mês ainda não foi colocado no portal.',
       })}
     </div>`;
+  }
+
+  // Próxima produção de conteúdo (agendada com até um mês de antecedência).
+  function cartaoProducao() {
+    const hoje = hojeISO();
+    const proxima = producoes.filter((p) => p.data >= hoje).sort((a, b) => (a.data + a.hora).localeCompare(b.data + b.hora))[0];
+    if (!proxima && !admin) return '';
+    const dias = proxima ? Math.round((dataObj(proxima.data) - dataObj(hoje)) / 864e5) : 0;
+    const falta = dias === 0 ? 'Hoje' : dias === 1 ? 'Amanhã' : `Em ${dias} dias`;
+    const d = proxima && dataObj(proxima.data);
+    return `
+      <div class="cartao cartao-producao${proxima && dias <= 1 ? ' perto' : ''}">
+        <div class="cab"><h3>${icones.producao}Próxima produção</h3>${admin ? `<button class="btn claro peq" data-producoes style="margin-left:auto">${proxima ? 'Agenda' : 'Agendar'}</button>` : ''}</div>
+        ${proxima ? `
+          <div class="producao-linha">
+            <span class="producao-data"><b>${d.getDate()}</b><small>${esc(diaSemanaCurto(proxima.data))}</small></span>
+            <div style="min-width:0">
+              <b class="producao-falta">${falta}${proxima.hora ? ` · ${esc(proxima.hora.replace(':', 'h').replace('h00', 'h'))}` : ''}</b>
+              <div class="muted" style="font-size:13px">${esc(dataLonga(proxima.data))}${proxima.local ? ` · ${esc(proxima.local)}` : ''}</div>
+              ${proxima.observacoes ? `<div style="font-size:13px;margin-top:4px">${esc(proxima.observacoes)}</div>` : ''}
+            </div>
+          </div>
+          ${!admin && ctx.abas?.has('moodboard') ? `<a class="link-producao" href="#${ctx.base}/moodboard">Ver o moodboard da produção</a>` : ''}`
+          : '<p class="muted" style="font-size:13.5px">Nenhuma produção agendada. Clique em “Agendar”.</p>'}
+      </div>`;
+  }
+
+  function agendarProducoes() {
+    const rota = `planejamento?cliente=${id}&tipo=producao`;
+    const m = abrirCamada('<div data-agenda></div>', { largo: true });
+    const caixa = m.el.querySelector('[data-agenda]');
+    const desenharAgenda = (editando = null) => {
+      const hoje = hojeISO();
+      const futuras = producoes.filter((p) => p.data >= hoje);
+      caixa.innerHTML = `
+        <h2>Produções de ${esc(cliente.nome)}</h2>
+        <p class="muted">A próxima aparece na visão geral do cliente. Na véspera, ele recebe “Amanhã é o dia da sua produção de conteúdo!” no app${agenda.emailConfigurado ? ' e por e-mail' : ''}.</p>
+        ${agenda.emailConfigurado ? '' : '<p class="aviso-email">O lembrete por e-mail ainda não está ligado: falta configurar o e-mail de envio (SMTP) na Vercel. O aviso no app já funciona.</p>'}
+        <div style="display:grid;gap:8px;margin:14px 0">${futuras.length ? futuras.map((p) => `
+          <div class="pessoa">
+            <div class="dados"><b style="font-weight:500">${esc(dataLonga(p.data))}${p.hora ? ` · ${esc(p.hora)}` : ''}</b><div class="muted" style="font-size:13px">${esc([p.local, p.observacoes].filter(Boolean).join(' · ') || 'Sem local')}</div></div>
+            <button class="btn-icone" data-editar-producao="${esc(p.id)}" title="Editar">${icones.editar}</button>
+            <button class="btn-icone" data-excluir-producao="${esc(p.id)}" title="Excluir">${icones.lixo}</button>
+          </div>`).join('') : '<p class="muted">Nenhuma produção agendada.</p>'}</div>
+        <form class="grade-campos" data-form-producao>
+          <label class="campo"><span>Data</span><input class="entrada" type="date" name="data" min="${hoje}" value="${esc(editando?.data || '')}" required></label>
+          <label class="campo"><span>Horário</span><input class="entrada" type="time" name="hora" value="${esc(editando?.hora || '')}"></label>
+          <label class="campo largo"><span>Local</span><input class="entrada" name="local" placeholder="Ex.: consultório, sala 302" value="${esc(editando?.local || '')}"></label>
+          <label class="campo largo"><span>Observações para o cliente</span><input class="entrada" name="observacoes" placeholder="Ex.: levar 3 looks claros" value="${esc(editando?.observacoes || '')}"></label>
+        </form>
+        <div class="rodape-modal"><button class="btn claro" data-fechar>Fechar</button><button class="btn acc" data-salvar-producao>${editando ? 'Salvar alterações' : 'Agendar produção'}</button></div>`;
+      caixa.querySelector('[data-salvar-producao]').onclick = async () => {
+        const f = caixa.querySelector('[data-form-producao]');
+        const item = { ...(editando ? { id: editando.id } : {}), data: f.data.value, hora: f.hora.value, local: f.local.value, observacoes: f.observacoes.value };
+        try {
+          ({ itens: producoes } = await api(rota, { metodo: 'POST', corpo: { acao: 'salvar', item } }));
+          aviso(editando ? 'Produção atualizada.' : 'Produção agendada.');
+          desenharAgenda();
+          desenhar();
+        } catch (err) { falhou(err); }
+      };
+      caixa.querySelectorAll('[data-editar-producao]').forEach((b) => { b.onclick = () => desenharAgenda(producoes.find((p) => p.id === b.dataset.editarProducao)); });
+      caixa.querySelectorAll('[data-excluir-producao]').forEach((b) => {
+        b.onclick = async () => {
+          if (!(await confirmar('A produção sai da agenda do cliente.', { botao: 'Excluir', perigo: true }))) return;
+          try { ({ itens: producoes } = await api(rota, { metodo: 'POST', corpo: { acao: 'excluir', id: b.dataset.excluirProducao } })); desenharAgenda(); desenhar(); } catch (err) { falhou(err); }
+        };
+      });
+    };
+    desenharAgenda();
   }
 
   function itemConteudo(p, hoje, compacto = false, semTrilha = false) {

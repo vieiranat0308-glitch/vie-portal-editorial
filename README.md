@@ -106,6 +106,16 @@ O portal é um app instalável (PWA), sem loja e sem custo: fica com o ícone da
 - Sem internet, o app mostra um aviso no lugar da tela de login e reabre sozinho quando a conexão volta.
 - Arquivos: `public/manifest.webmanifest`, `public/sw.js` (guarda só o necessário para o aviso offline; a API nunca é guardada), `public/offline.html`, `public/js/instalar.js` e os ícones `public/img/app-*.png` e `apple-touch-icon.png`.
 
+## Moodboard, calendário sazonal e produções
+
+- **Moodboard** (Gestão de Instagram e Produção de vídeo): o roteiro de gravação de vídeo e foto das próximas produções. A equipe envia em **PDF** (abre dentro do portal, página por página, também no celular), **Word** (o cliente baixa) ou **link** (Drive, Canva). O cliente aprova ou pede alteração; “Nova versão” troca o arquivo e volta para aprovação. O cliente recebe aviso no celular quando chega moodboard.
+- **Calendário sazonal** (Gestão de Instagram): as datas importantes dos próximos meses com a ação de marketing de cada uma. **Sugestões de datas** traz as datas comerciais e da saúde dos próximos 12 meses (inclusive Páscoa, Carnaval, Dia das Mães, Dia dos Pais e Black Friday, calculados para cada ano). Escreva as ações e use **Avisar o cliente**. Mudar a data ou a ação de uma data já aprovada volta para aprovação.
+- **Próxima produção** (visão geral, em cima do calendário): a equipe agenda em **Agendar/Agenda** (data, horário, local, observações). Na véspera, às 8h, o cliente recebe **“Amanhã é o dia da sua produção de conteúdo!”** no app e **por e-mail**, e a equipe recebe o aviso no app.
+- **Aprovar tudo**: na página Aprovação, o cliente aprova de uma vez os conteúdos, cronogramas em HTML, moodboards e datas sazonais que estão esperando.
+
+### E-mail do lembrete (grátis)
+O lembrete por e-mail sai por SMTP. Com uma conta do Gmail: ative a verificação em duas etapas, crie uma **senha de app** (Conta Google → Segurança → Senhas de app) e cadastre na Vercel `SMTP_USER` (o e-mail) e `SMTP_PASS` (a senha de app). Opcionais: `SMTP_HOST` e `SMTP_PORT` (outro provedor; padrão smtp.gmail.com:465) e `EMAIL_REMETENTE`. Sem essas variáveis, o lembrete sai só no app. O Gmail gratuito envia até cerca de 500 e-mails por dia.
+
 ## Equipe Vie: quem vê quais clientes
 
 Em **Equipe Vie** → **Convidar**, escolha **Todos os clientes** (inclusive os que forem cadastrados depois) ou marque só os clientes daquela pessoa. O botão **Clientes** ao lado de cada pessoa muda isso depois.

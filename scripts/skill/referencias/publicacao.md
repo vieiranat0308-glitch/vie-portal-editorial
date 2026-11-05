@@ -8,6 +8,7 @@
    - `ADMIN_EMAIL`: e-mail de login da dona da empresa (conta principal).
    - `ADMIN_PASSWORD`: senha forte.
    - `ADMIN_NOME`: como o portal chama essa pessoa.
+   - E-mail do lembrete de produção (opcional, grátis com Gmail): `SMTP_USER` (o e-mail) e `SMTP_PASS` (senha de app do Google, com verificação em duas etapas ligada). Sem elas, o lembrete sai só no app.
    - Opcionais: `GOOGLE_API_KEY` (ler pastas do Drive pela API oficial, grátis), `CRON_SECRET` (protege a rotina diária de notificações), `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` (fixar as chaves de push; sem elas o portal cria e guarda no banco).
 6. **Redeploy** (*Deployments → Redeploy*) para as variáveis valerem.
 7. Entre com o e-mail e a senha, crie um cliente (ou o de exemplo), convide a equipe (*Equipe*) e os clientes (*Acessos do cliente*).

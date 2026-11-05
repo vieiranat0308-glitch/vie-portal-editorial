@@ -35,6 +35,8 @@ TROCAS = [
     (r'pelo exemplo da Dra\. Izabella', 'por um cliente de exemplo'),
     (r'Ex\.: Dra\. Izabella Rebello', 'Ex.: Clínica Bem Estar'),
     (r'Ex\.: Izabella', 'Ex.: Ana'),
+    (r'Ex\.: consultório, sala 302', 'Ex.: estúdio, sala 302'),
+    (r'Produção de novembro · consultório', 'Produção de novembro · estúdio'),
     (r' \(como o da Due Medicina\)', ''),
     (r'traz a linha editorial da Dra\. Izabella como exemplo', 'traz um cliente de exemplo (linha editorial, ideias, métricas)'),
     (r"process\.env\.ADMIN_NOME \|\|= 'Natalia'", "process.env.ADMIN_NOME ||= '{{NOME_ADMIN}}'"),

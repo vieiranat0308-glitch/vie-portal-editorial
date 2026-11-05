@@ -8,7 +8,7 @@ import { etiquetasServicos } from '../componentes/servicos.js';
 let filtroServico = '';
 
 const NOMES_ABAS = {
-  linha: 'Linha editorial', cronograma: 'Cronograma', cronogramaVie: 'Cronograma da Vie separado', aprovacao: 'Aprovação', ideias: 'Banco de ideias', evolucao: 'Evolução do perfil', metricas: 'Métricas',
+  linha: 'Linha editorial', cronograma: 'Cronograma', cronogramaVie: 'Cronograma da Vie separado', sazonal: 'Calendário sazonal', moodboard: 'Moodboard', aprovacao: 'Aprovação', ideias: 'Banco de ideias', evolucao: 'Evolução do perfil', metricas: 'Métricas',
 };
 // O cliente tem algum serviço que inclui a aba?
 const temAba = (c, aba, servicos) => servicos.some((s) => (c.servicos || []).includes(s.id) && (s.abas || []).includes(aba));

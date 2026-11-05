@@ -11,6 +11,8 @@ const PAGINAS = {
   painel: () => import('./paginas/painel.js'),
   linha: () => import('./paginas/linha.js'),
   cronograma: () => import('./paginas/cronograma.js'),
+  sazonal: () => import('./paginas/sazonal.js'),
+  moodboard: () => import('./paginas/moodboard.js'),
   aprovacao: () => import('./paginas/aprovacao.js'),
   ideias: () => import('./paginas/ideias.js'),
   evolucao: () => import('./paginas/evolucao.js'),
@@ -26,6 +28,8 @@ const MENU_CLIENTE = [
     ['painel', 'Visão geral', 'geral'],
     ['linha', 'Linha editorial', 'livro'],
     ['cronograma', 'Cronograma', 'calendario'],
+    ['sazonal', 'Calendário sazonal', 'sazonal'],
+    ['moodboard', 'Moodboard', 'moodboard'],
     ['aprovacao', 'Aprovação', 'aprovacao'],
     ['ideias', 'Banco de ideias', 'ideia'],
   ] },
@@ -355,13 +359,20 @@ async function atualizarContadorAprovacao({ cliente, admin }) {
   const alvo = app.querySelector('[data-contador-aprovacao]');
   if (!alvo || !cliente) return;
   try {
-    const meses = await api(`cronograma?cliente=${encodeURIComponent(cliente.id)}`);
+    const id = encodeURIComponent(cliente.id);
+    const abas = abasDoCliente(cliente);
+    // Moodboards e datas sazonais contam junto com os conteúdos do cronograma.
+    const [meses, ...extras] = await Promise.all([
+      api(`cronograma?cliente=${id}`),
+      ...['moodboard', 'sazonal'].filter((t) => abas.has(t)).map((t) => api(`planejamento?cliente=${id}&tipo=${t}`).catch(() => [])),
+    ]);
     const chave = admin ? 'ajuste' : 'aprovacao';
     const mesInterativo = admin ? 'ajuste' : 'aguardando';
-    const total = meses.reduce((s, m) => s + (m.porStatus[chave] || 0) + (m.aprovacaoMes === mesInterativo ? 1 : 0), 0);
+    const total = meses.reduce((s, m) => s + (m.porStatus[chave] || 0) + (m.aprovacaoMes === mesInterativo ? 1 : 0), 0)
+      + extras.flat().filter((i) => i.status === chave).length;
     alvo.textContent = total || '';
     alvo.classList.toggle('alerta', total > 0);
-    alvo.title = admin ? 'Ajustes pedidos pelo cliente' : 'Conteúdos esperando a sua aprovação';
+    alvo.title = admin ? 'Ajustes pedidos pelo cliente' : 'Itens esperando a sua aprovação';
   } catch { /* contador é só um extra */ }
 }
 

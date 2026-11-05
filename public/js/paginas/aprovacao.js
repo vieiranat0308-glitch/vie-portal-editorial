@@ -1,7 +1,8 @@
 // Aprovação: o que está esperando o cliente e o que o cliente pediu para ajustar.
-import { api, esc, aviso, falhou, abrirCamada, dataLonga, quando } from '../ui.js';
+import { api, esc, aviso, falhou, abrirCamada, confirmar, dataLonga, quando } from '../ui.js';
 import { corDoPilar, nomeDoMes } from '../regras.js';
 import { abrirPost, etiquetaFormato, etiquetaPilar, etiquetaStatus, capaDrive } from '../componentes/post.js';
+import { botoesAprovacao, ultimoPedido, ligarAprovacao } from '../componentes/planejamento.js';
 
 export async function render(el, ctx) {
   const { cliente, admin } = ctx;
@@ -12,7 +13,12 @@ export async function render(el, ctx) {
 
   let itens = [];
   let mesesInterativos = [];
+  // Moodboards e datas do calendário sazonal entram junto, quando o cliente tem essas abas.
+  const extrasDoCliente = ['moodboard', 'sazonal'].filter((t) => ctx.abas?.has(t));
+  let extras = { moodboard: [], sazonal: [] };
   async function carregar() {
+    const listas = await Promise.all(extrasDoCliente.map((t) => api(`planejamento?cliente=${id}&tipo=${t}`).catch(() => [])));
+    extrasDoCliente.forEach((t, i) => { extras[t] = listas[i]; });
     const meses = await api(`cronograma?cliente=${id}`);
     mesesInterativos = meses.filter((m) => m.interativo && m.status === 'publicado' && m.aprovacaoMes !== 'aprovado');
     const relevantes = meses.filter((m) => (m.porStatus.aprovacao || 0) + (m.porStatus.ajuste || 0) > 0);
@@ -65,14 +71,68 @@ export async function render(el, ctx) {
           <a class="btn claro peq" href="#${ctx.base}/cronograma/${m.mes}">Abrir cronograma</a>
           ${!admin ? `<button class="btn acc peq" data-aprovar-mes="${m.mes}">✓ Aprovado</button>${m.aprovacaoMes !== 'ajuste' ? `<button class="btn claro peq" data-alterar-mes="${m.mes}">Alterar</button>` : ''}` : ''}
         </div>`).join('')}</div>` : '';
+    const estado = admin ? 'ajuste' : 'aprovacao';
+    const hoje = new Date().toISOString().slice(0, 10);
+    const pendentesExtras = {
+      moodboard: extras.moodboard.filter((m) => m.status === estado),
+      sazonal: extras.sazonal.filter((s) => s.status === estado && (admin || s.data >= hoje)),
+    };
+    // Tudo o que dá para aprovar de uma vez (só o que já foi liberado para o cliente).
+    const paraAprovar = itens.filter((p) => p.status === 'aprovacao' && p.publicado).length
+      + mesesInterativos.filter((m) => m.aprovacaoMes !== 'ajuste').length
+      + pendentesExtras.moodboard.length + pendentesExtras.sazonal.length;
+    const blocoExtras = [['moodboard', 'Moodboards', 'moodboard'], ['sazonal', 'Calendário sazonal', 'sazonal']]
+      .filter(([t]) => pendentesExtras[t].length).map(([t, titulo, aba]) => `
+        <div class="secao-titulo"><h2>${titulo}</h2><span class="etq">${pendentesExtras[t].length}</span></div>
+        <div style="display:grid;gap:12px">${pendentesExtras[t].map((i) => `
+          <div class="cartao" style="display:grid;gap:10px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              ${i.data ? `<span class="mono muted" style="font-size:10.5px">${esc(dataLonga(i.data))}</span>` : ''}
+              <span style="margin-left:auto">${etiquetaStatus(i.status)}</span>
+            </div>
+            <h3 class="serif" style="font-size:22px">${esc(i.titulo)}</h3>
+            ${i.acao || i.descricao ? `<p class="muted" style="font-size:14px;white-space:pre-line">${esc(i.acao || i.descricao)}</p>` : ''}
+            ${ultimoPedido(i)}
+            <div class="botoes-aprovacao" data-tipo="${t}">${botoesAprovacao(i, admin)}<a class="btn fantasma peq" href="#${ctx.base}/${aba}">${t === 'moodboard' ? 'Ver moodboard' : 'Ver calendário'}</a></div>
+          </div>`).join('')}</div>`).join('');
     el.innerHTML = `
+      ${!admin && paraAprovar ? `
+        <div class="faixa-aprovar-tudo destaque">
+          <div><b>${paraAprovar} ${paraAprovar === 1 ? 'item esperando' : 'itens esperando'} a sua aprovação</b><p style="font-size:13.5px;opacity:.85">Já viu e está tudo certo? Aprove tudo de uma vez.</p></div>
+          <button class="btn acc" data-aprovar-tudo>✓ Aprovar tudo (${paraAprovar})</button>
+        </div>` : ''}
       <section class="saudacao"><h1>Aprovação</h1><p>${admin
         ? 'Acompanhe o que está com o cliente e responda os pedidos de ajuste.'
         : 'Aqui ficam os conteúdos que a equipe Vie preparou para você. Toque em <b>Aprovado</b> ou em <b>Alterar</b> e conte o que mudar.'}</p></section>
       ${blocoMeses}
-      ${(itens.length || !mesesInterativos.length ? secoes : []).map(([titulo, lista, vazio]) => `
+      ${(itens.length || (!mesesInterativos.length && !blocoExtras) ? secoes : []).map(([titulo, lista, vazio]) => `
         <div class="secao-titulo"><h2>${titulo}</h2><span class="etq">${lista.length}</span></div>
-        ${lista.length ? `<div style="display:grid;gap:12px">${lista.map(bloco).join('')}</div>` : `<div class="vazio">${vazio}</div>`}`).join('')}`;
+        ${lista.length ? `<div style="display:grid;gap:12px">${lista.map(bloco).join('')}</div>` : `<div class="vazio">${vazio}</div>`}`).join('')}
+      ${blocoExtras}`;
+    // Aprovado / Alterar dos moodboards e datas sazonais.
+    el.querySelectorAll('.botoes-aprovacao[data-tipo]').forEach((caixa) => {
+      const tipo = caixa.dataset.tipo;
+      ligarAprovacao(caixa, { ctx, tipo, itens: () => extras[tipo], nome: '', aoMudar: async () => { await carregar().catch(falhou); desenhar(); } });
+    });
+    // "Aprovar tudo": conteúdos de todos os meses liberados, cronogramas em HTML, moodboards e datas sazonais.
+    el.querySelector('[data-aprovar-tudo]')?.addEventListener('click', async (ev) => {
+      if (!(await confirmar(`Aprovar os ${paraAprovar} ${paraAprovar === 1 ? 'item' : 'itens'} que estão esperando? A equipe é avisada na hora.`, { botao: 'Aprovar tudo' }))) return;
+      ev.target.disabled = true;
+      try {
+        const meses = [...new Set([...itens.filter((p) => p.status === 'aprovacao' && p.publicado).map((p) => p.mes), ...mesesInterativos.filter((m) => m.aprovacaoMes !== 'ajuste').map((m) => m.mes)])];
+        await Promise.all([
+          ...meses.map((mes) => api(`cronograma?cliente=${id}&mes=${mes}`, { metodo: 'POST', corpo: { acao: 'aprovar-todos' } })),
+          ...['moodboard', 'sazonal'].filter((t) => pendentesExtras[t].length).map((t) => api(`planejamento?cliente=${id}&tipo=${t}`, { metodo: 'POST', corpo: { acao: 'aprovar-todos' } })),
+        ]);
+        aviso('Tudo aprovado! A equipe já foi avisada. Obrigada!');
+        ctx.atualizarContadores?.();
+        await carregar();
+        desenhar();
+      } catch (err) {
+        falhou(err);
+        ev.target.disabled = false;
+      }
+    });
     const enviar = async (mes, corpo, mensagem) => {
       try {
         await api(`cronograma?cliente=${id}&mes=${mes}`, { metodo: 'POST', corpo });
